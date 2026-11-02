@@ -84,8 +84,10 @@
         let r;
         if (!refs.length) {
           const body = {model: model(), prompt, size, n: 1};
-          if (kind === 'openai') body.quality = q; else body.response_format = 'b64_json';
-          r = await xfetch(base() + '/images/generations', {method: 'POST', headers: {'Content-Type': 'application/json', ...auth()}, body: JSON.stringify(body)});
+          if (kind === 'openai') body.quality = q; else Object.assign(body, {response_format: 'b64_json', seed: 42, width: 1664, height: 928});
+          const post = b => xfetch(base() + '/images/generations', {method: 'POST', headers: {'Content-Type': 'application/json', ...auth()}, body: JSON.stringify(b)});
+          r = await post(body);
+          if (kind !== 'openai' && (r.status === 400 || r.status === 422)) r = await post({model: model(), prompt});
         } else {
           const fd = new FormData(); fd.append('model', model()); fd.append('prompt', prompt); fd.append('size', size); fd.append('n', '1');
           if (kind === 'openai') fd.append('quality', q); else fd.append('response_format', 'b64_json');
@@ -95,11 +97,21 @@
         const j = await readJson(r);
         if (r.status === 404) throw new Error(`This server has no ${refs.length ? '/images/edits' : '/images/generations'} endpoint. Check the image API is switched on.`);
         if (!r.ok) throw new Error(errMsg(j, r));
-        const d = j.data?.[0]; if (!d) throw new Error('No image came back.');
-        return d.b64_json ? b64ToDataUrl(d.b64_json) : urlToDataUrl(d.url);
+        const d = j.data?.[0] || j.images?.[0] || j.output?.[0] || j;
+        const b64 = d?.b64_json || d?.b64 || d?.image_base64 || d?.base64 || (typeof d === 'string' && !/^https?:/.test(d) ? d : null);
+        if (b64) return b64.startsWith('data:') ? b64 : b64ToDataUrl(b64);
+        const u = d?.url || d?.image_url || (typeof d === 'string' ? d : null);
+        if (u) return urlToDataUrl(/^https?:|^data:/.test(u) ? u : base().replace(/\/v1$/, '') + u);
+        throw new Error('No image came back: ' + JSON.stringify(j).slice(0, 160));
       },
       async test() { const r = await xfetch(base() + '/models', {headers: auth()}); const j = await readJson(r); if (!r.ok) throw new Error(errMsg(j, r));
-        const ids = (j.data || []).map(m => m.id); P[kind].models = ids; return ids.length ? `Connected. Models: ${ids.slice(0, 12).join(', ')}${ids.length > 12 ? '…' : ''}` : 'Connected.'; },
+        const ids = (j.data || []).map(m => m.id); P[kind].models = ids;
+        let caps = '';
+        if (kind !== 'openai') { try { const o = await readJson(await xfetch(base().replace(/\/v1$/, '') + '/openapi.json', {headers: auth()})); const paths = Object.keys(o.paths || {});
+          if (paths.length) { const gen = paths.some(p => /images\/generations/.test(p)), edit = paths.some(p => /images\/edits/.test(p)); S.caps = {...(S.caps || {}), [kind]: {edit}}; save(S);
+            caps = ` Image generation: ${gen ? 'yes' : 'NO'}. Image edits: ${edit ? 'yes' : 'no, so each stage is rendered fresh from the same camera prompt'}.`; } } catch (e) {} }
+        const img = ids.filter(i => /image|flux|sd|diffus|qwen-?image|ernie/i.test(i));
+        return `Connected. ${img.length ? 'Image models: ' + img.join(', ') : 'Models: ' + ids.slice(0, 10).join(', ')}.${caps}`; },
     };
   }
   P.openai = openaiLike('openai'); P.unsloth = openaiLike('unsloth'); P.custom = openaiLike('custom');
@@ -144,6 +156,8 @@
 
   window.Img = {
     NAMES, get settings() { return S; }, save, load, run, test: () => (P[S.provider] || P.offline).test(), hasServer, useProxy,
-    providerModels: k => P[k]?.models || [], fileImage, cacheGet, cachePut, cacheClear, hash, toDataUrl, isOffline: () => S.provider === 'offline',
+    providerModels: k => P[k]?.models || [],
+    // Unsloth's API has /images/generations but no /images/edits, so it renders each stage fresh unless a test found edits
+    canEdit: () => S.provider === 'unsloth' || S.provider === 'custom' ? !!S.caps?.[S.provider]?.edit : S.provider !== 'offline', fileImage, cacheGet, cachePut, cacheClear, hash, toDataUrl, isOffline: () => S.provider === 'offline',
   };
 })();

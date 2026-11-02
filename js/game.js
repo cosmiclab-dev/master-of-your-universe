@@ -70,9 +70,10 @@ function title() {
       <div class="field"><label>Your role</label><div class="seg c3" id="roles">
         ${[['field', 'Field engineer'], ['sales', 'Sales'], ['office', 'Office based']].map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${G.role === v}">${l}</button>`).join('')}</div></div>
       <button class="gbtn big" id="play" type="button">PLAY</button>
-      <p class="note" style="text-align:center;margin:0">${Img.isOffline() ? 'Offline mode: add an image model in Settings to see your office built for real.' : 'Image model: ' + esc(Img.NAMES[Img.settings.provider])}</p>
+      ${Img.isOffline() ? `<div style="background:#0a2a6b;border-radius:14px;padding:12px;display:flex;gap:10px;align-items:center"><span style="font-weight:800;flex:1">No image model connected yet, so you’ll only see pins. Connect one to see your office rendered.</span><button class="gbtn sm" id="setup" type="button">SET UP</button></div>`
+        : `<p class="note" style="text-align:center;margin:0">Image model: ${esc(Img.NAMES[Img.settings.provider])}</p>`}
     </div></section>`;
-  $('#gear').onclick = settings;
+  $('#gear').onclick = settings; if ($('#setup')) $('#setup').onclick = settings;
   $('#roles').onclick = e => { const b = e.target.closest('button'); if (!b) return; G.role = b.dataset.v; $('#roles').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); };
   const go = () => { G.name = ($('#nm').value || '').trim() || 'Builder'; route('s1'); };
   $('#play').onclick = go; $('#nm').onkeydown = e => { if (e.key === 'Enter') go(); };
@@ -95,8 +96,8 @@ function route(next) {
       <g font-family="Lilita One, Arial Black, sans-serif" font-size="22" fill="#6d87b3" text-anchor="middle"><text x="230" y="120">TEAM SPACE</text><text x="525" y="120">WORKCAFÉ</text><text x="795" y="120">MEETING ROOM</text></g>
       <path id="rp" class="route-path" d="M110 430 C 180 400, 200 340, 250 300 S 430 160, 520 180 S 700 330, 790 300 S 880 400, 900 430" fill="none" stroke="#1474e0" stroke-width="10"/>
       ${nodes.map((n, j) => { const done = doneStops.includes(n.k), on = n.k === next;
-        return `<g class="stop-node ${on ? 'pulse' : ''}" transform="translate(${n.x} ${n.y})"><polygon points="0,-46 40,-23 40,23 0,46 -40,23 -40,-23" fill="${done ? '#53ce17' : on ? '#fac602' : '#40436c'}" stroke="#0a2a6b" stroke-width="7"/>
-          <text y="14" text-anchor="middle" font-family="Lilita One, Arial Black, sans-serif" font-size="40" fill="#fff" stroke="#13204a" stroke-width="6" paint-order="stroke">${done ? '✓' : j + 1}</text></g>`; }).join('')}
+        return `<g transform="translate(${n.x} ${n.y})"><g class="stop-node ${on ? 'pulse' : ''}"><polygon points="0,-46 40,-23 40,23 0,46 -40,23 -40,-23" fill="${done ? '#53ce17' : on ? '#fac602' : '#40436c'}" stroke="#0a2a6b" stroke-width="7"/>
+          <text y="14" text-anchor="middle" font-family="Lilita One, Arial Black, sans-serif" font-size="40" fill="#fff" stroke="#13204a" stroke-width="6" paint-order="stroke">${done ? '✓' : j + 1}</text></g></g>`; }).join('')}
       <g id="av"><circle r="26" fill="#1474e0" stroke="#fff" stroke-width="6"/><text y="10" text-anchor="middle" font-family="Lilita One, Arial Black, sans-serif" font-size="28" fill="#fff">${esc(G.name.charAt(0).toUpperCase())}</text></g>
     </svg>
     <button class="gbtn big ${next === 'close' ? 'green' : ''}" id="go" type="button">${next === 'close' ? 'SEE IT' : 'GO TO STOP ' + (idx + 1)}</button>
@@ -229,6 +230,11 @@ function pins(s) {
 function status(s, kind, text) {
   G.status[s] = kind ? {kind, text} : null;
   const el = $('#vst'); if (!el || stopOf(D.steps[G.i]?.step || '') !== s) return;
+  $('#vperr')?.remove();
+  if (kind === 'err') $('#vp').insertAdjacentHTML('beforeend', `<div id="vperr" style="position:absolute;inset:0;display:grid;place-items:center;background:rgba(8,30,80,.82);padding:24px;text-align:center"><div style="max-width:520px;display:flex;flex-direction:column;gap:12px;align-items:center">
+    <span class="dt sm" style="font-size:26px">The image model didn’t answer</span><span style="font-weight:800;color:#dbeaff">${esc(text)}</span>
+    <div class="row"><button class="gbtn sm" id="vpset" type="button">OPEN SETTINGS</button><button class="gbtn green sm" id="vpretry" type="button">TRY AGAIN</button></div></div></div>`);
+  if (kind === 'err') { $('#vpset').onclick = settings; $('#vpretry').onclick = () => build(s); }
   if (!kind) { el.hidden = true; $('#vp .scan')?.remove(); return; }
   el.hidden = false; el.className = 'vp-status' + (kind === 'err' ? ' err' : '');
   el.innerHTML = (kind === 'busy' ? '<span class="spinner"></span>' : '') + esc(text);
@@ -263,10 +269,25 @@ async function layoutImage(L) {
   if (f) return {url: (await Img.toDataUrl(f)) || f, key: 'file:' + L.id};
   const c = await Img.cacheGet('base:' + L.id); if (c) return {url: c, key: 'base:' + L.id};
   if (Img.isOffline()) return null;
+  if (!Img.canEdit()) { const r = await Img.run({prompt: `${D.diorama.look} On the platform: ${L.prompt.replace(/^Furnish this empty platform as /, '').split('. Use the whole platform')[0]}.`, refs: [], refKeys: []});
+    await Img.cachePut('base:' + L.id, r.url); saveToServer(L.id, r.url); return {url: r.url, key: 'base:' + L.id}; }
   const m = await master();
   const r = await Img.run({prompt: L.prompt, refs: [m], refKeys: ['base:' + D.diorama.master.id]});
   await Img.cachePut('base:' + L.id, r.url); saveToServer(L.id, r.url);
   return {url: r.url, key: 'base:' + L.id};
+}
+const DESCRIBE = {'s1.desk': 'Every desk has {list}.', 's1.hood': 'Around the desk cluster: {list}.', 's1.near': '{placed}.', 's2.seat': 'Seating: {placed}.', 's2.fun': '{placed}.', 's2.work': '{placed}.',
+  's2.next': 'In the back-right corner, behind a low glass wall: {list}.', 's3.kit': 'Inside the room: {list}.'};
+function describe(k) {
+  const p = G.picks[k] || [], f = clean(G.free[k]); if (!p.length && !f) return '';
+  let t = p.length ? (D.slots[k] ? DESCRIBE[k].replace('{placed}', p.map((id, j) => `${OPT[id].fragment} ${D.slots[k][j]?.loc || ''}`.trim()).join('; ')) : DESCRIBE[k].replace('{list}', list(p.map(id => OPT[id].fragment).filter(Boolean)))) : '';
+  return (t + (f ? ` Also: ${f}.` : '')).trim();
+}
+function scenePrompt(s, upto) {
+  const L = D.diorama.layouts.find(l => l.option === pick1(LAYOUT[s]));
+  const txt = L.prompt.replace(/^Furnish this empty platform as /, '').split('. Use the whole platform')[0];
+  const extra = EDIT_STEPS.filter(k => stopOf(k) === s && G.done.has(k) && (!upto || EDIT_STEPS.indexOf(k) <= EDIT_STEPS.indexOf(upto))).map(describe).filter(Boolean).join(' ');
+  return `${D.diorama.look} On the platform: ${txt}. ${extra}`.trim();
 }
 function instruction(k) {
   const p = G.picks[k] || [], f = clean(G.free[k]);
@@ -280,6 +301,16 @@ async function build(s) {
   const ver = ++G.ver[s], lid = pick1(LAYOUT[s]);
   if (!lid) return;
   const L = D.diorama.layouts.find(l => l.option === lid);
+  if (!Img.isOffline() && !Img.canEdit()) {   // generate-only model: render the whole stage in one go, same camera prompt, fixed seed
+    const f = await Img.fileImage(L.id), anyEdits = EDIT_STEPS.some(k => stopOf(k) === s && G.done.has(k) && describe(k));
+    if (f && !anyEdits) { G.img[s] = f; status(s, null); paintViewport(s, true); return; }
+    status(s, 'busy', anyEdits ? 'Rendering your ' + STOPS.find(x => x.k === s).n.replace('My ', '') + '…' : 'Setting up ' + OPT[lid].label + '…');
+    try { const r = await Img.run({prompt: scenePrompt(s), refs: [], refKeys: []}); if (ver !== G.ver[s]) return;
+      G.img[s] = r.url; G.imgKey[s] = Img.hash(scenePrompt(s)); if (!anyEdits) { Img.cachePut('base:' + L.id, r.url); saveToServer(L.id, r.url); }
+      status(s, null); paintViewport(s, true); }
+    catch (e) { if (ver === G.ver[s]) { status(s, 'err', e.message.slice(0, 220)); paintViewport(s); } }
+    return;
+  }
   status(s, 'busy', 'Setting up ' + OPT[lid].label + '…');
   let base;
   try { base = await layoutImage(L); } catch (e) { if (ver === G.ver[s]) { status(s, 'err', 'Image model: ' + e.message); paintViewport(s); } return; }
@@ -350,7 +381,7 @@ async function final(again) {
     <div class="frame" id="frame"><div class="wait"><span class="dt" style="font-size:28px">RENDERING…</span><div class="bar"><i></i></div><span style="color:#cfe0ff;font-weight:800">A photoreal render of your picks. About 20 to 60 seconds.</span></div></div>
     <div class="row" id="frow" hidden><button class="gbtn navy" id="again" type="button">RENDER AGAIN</button><button class="gbtn green big" id="all" type="button">SEE ALL</button></div></div></section>`;
   saveSession();
-  const ref = G.img[s] && G.img[s].startsWith('data:') ? G.img[s] : null;
+  const ref = Img.canEdit() && G.img[s] && G.img[s].startsWith('data:') ? G.img[s] : null;
   const prompt = finalPrompt(s, !!ref) + (again ? ` Variation ${Date.now() % 1000}.` : '');
   let ok = false;
   if (!Img.isOffline()) {
@@ -424,7 +455,7 @@ function settings() {
     m.hidden = false;
     $('#route').value = S.route; $('#qual').value = S.quality;
     m.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { read(); S.provider = b.dataset.p; draw(); });
-    $('#x').onclick = () => { m.hidden = true; m.innerHTML = ''; };
+    $('#x').onclick = () => { m.hidden = true; m.innerHTML = ''; if (G.i === -1 && $('.title-panel')) title(); else if (G.i >= 0 && D.steps[G.i] && stopOf(D.steps[G.i].step) !== 'close') build(stopOf(D.steps[G.i].step)); };
     $('#save').onclick = () => { read(); Img.save(S); say('Saved.', 'ok'); };
     $('#test').onclick = async () => { read(); Img.save(S); say('Testing…'); try { say(await Img.test(), 'ok'); if (S.provider === 'unsloth' || S.provider === 'custom') { const dl = $('#mlist'); if (dl) dl.innerHTML = Img.providerModels(S.provider).map(x => `<option value="${esc(x)}">`).join(''); } } catch (e) { say(e.message, 'bad'); } };
     $('#gen').onclick = genPack; $('#clr').onclick = async () => { await Img.cacheClear(); say('Cache cleared.', 'ok'); pack(); };
