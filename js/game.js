@@ -33,10 +33,11 @@ const $ = s => document.querySelector(s), app = $('#app');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 const stopOf = k => k.split('.')[0];
 const pick1 = k => (G.picks[k] || [])[0];
+const shot = s => G.img[s] || (window.Builder && G.picks[LAYOUT[s]]?.length ? Builder.snapshot(s, G.picks) : null);
 const clean = t => (t || '').replace(/[^\p{L}\p{N} ,.'-]/gu, '').trim().slice(0, 80);
 const list = a => a.length < 2 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a.at(-1);
 
-const G = {name: '', role: 'field', i: -1, picks: {}, free: {}, times: {}, done: new Set(), img: {}, imgKey: {}, ver: {s1: 0, s2: 0, s3: 0}, status: {}, seen: new Set(), change: '', final: null, t0: 0};
+const G = {name: '', role: 'field', i: -1, picks: {}, free: {}, times: {}, done: new Set(), img: {}, imgKey: {}, ver: {s1: 0, s2: 0, s3: 0}, status: {}, seen: new Set(), change: '', final: null, t0: 0, view: {}, born: {}};
 
 // ============================================================ effects
 const fx = $('#fx'), fctx = fx.getContext('2d'); let parts = [];
@@ -137,7 +138,7 @@ function step() {
   const visualStop = s === 'close' ? 'close' : s;
   app.innerHTML = `<section class="screen">${hud(visualStop)}
     <div class="stage">
-      <div class="vpwrap"><div class="vp" id="vp">${s === 'close' ? triptych() : ''}<div class="pins" id="pins"></div><div class="vp-tag" id="tags"></div><div class="vp-status" id="vst" hidden></div><div class="flash" id="flash"></div></div></div>
+      <div class="vpwrap"><div class="vp" id="vp">${s === 'close' ? triptych() : '<canvas class="bcanvas" id="bc" aria-label="Your office, built live"></canvas>'}<div class="vtoggle" id="vtog"></div><div class="pins" id="pins"></div><div class="vp-tag" id="tags"></div><div class="vp-status" id="vst" hidden></div><div class="flash" id="flash"></div></div></div>
       <div class="card-panel qpanel">
         <div class="qhead"><div class="eye">${s === 'close' ? 'See it' : STOPS.find(x => x.k === s).n} · step ${D.steps.filter(x => stopOf(x.step) === s).findIndex(x => x.step === k) + 1} of ${D.steps.filter(x => stopOf(x.step) === s).length}</div>
           <h2>${esc(title)}</h2><p>${esc(D.hint[k] || '')}</p></div>
@@ -189,13 +190,14 @@ function toggle(k, id, max, el) {
     if (max === 1) p.splice(0, p.length, id);
     else if (p.length < max) p.push(id);
     else { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); return toast(`Only ${max}. Remove one first.`, true); }
+    G.born[id] = performance.now(); G.view[s] = '3d';
     if (OPT[id]?.wildcard) { toast('★ New idea unlocked!'); const r = el.getBoundingClientRect(); confetti(40, r.left + r.width / 2, r.top + 30); }
   }
   document.querySelectorAll('.opt').forEach(b => b.setAttribute('aria-pressed', p.includes(b.dataset.id)));
   const top = hud(s === 'close' ? 'close' : s); document.querySelector('.hud').outerHTML = top; $('#gear').onclick = settings;
   if (at < 0 && OPT[id]?.wildcard) $('#ideas')?.classList.add('bump');
   foot();
-  if (s !== 'close') { pins(s); if (k === LAYOUT[s]) { G.done.add(k); build(s); } }
+  if (s !== 'close') { if (at >= 0) G.view[s] = '3d'; paintViewport(s); if (k === LAYOUT[s]) { G.done.add(k); build(s); } }
 }
 function next() {
   const st = D.steps[G.i], k = st.step, s = stopOf(k);
@@ -220,9 +222,20 @@ function pinList(s) {
   }
   return out;
 }
+const PIN_TAGS = k => k === 's1.desk' ? (G.picks['s1.desk'] || []) : null;
+function place(p, s) {
+  if (G.view[s] === 'render' && G.img[s]) return p;
+  const tags = p.key.startsWith('free:') ? null : p.key.includes(':') ? (PIN_TAGS(p.key.split(':')[0]) || p.key.split(':')[1].split(',')) : [p.key.split('@')[0]];
+  let a = tags && window.Builder ? Builder.anchor(tags) : null;
+  if (!a && p.key.startsWith('s1.desk')) a = Builder.anchor([pick1('s1.cluster')]);
+  return a ? {...p, x: Math.max(6, Math.min(94, a.x)), y: Math.max(14, Math.min(96, a.y))} : p;
+}
 function pins(s) {
   const box = $('#pins'); if (!box) return;
-  box.innerHTML = pinList(s).map(p => { const isNew = !G.seen.has(p.key); G.seen.add(p.key);
+  // keep labels from piling on top of each other
+  const W = box.clientWidth || 800, H = box.clientHeight || 450, placed = [];
+  const spread = p => { let x = p.x / 100 * W, y = p.y / 100 * H; for (let n = 0; n < 12; n++) { const hit = placed.find(q => Math.abs(q.x - x) < 150 && Math.abs(q.y - y) < 46); if (!hit) break; y = hit.y - 48; if (y < 60) { y = hit.y + 48; x += 40; } } placed.push({x, y}); return {...p, x: x / W * 100, y: y / H * 100}; };
+  box.innerHTML = pinList(s).map(p0 => place(p0, s)).sort((a, b) => b.y - a.y).map(spread).map(p => { const isNew = !G.seen.has(p.key); G.seen.add(p.key);
     return `<div class="pin ${p.w ? 'w' : ''} ${isNew ? 'pop' : ''}" style="left:${p.x}%;top:${p.y}%"><span class="lab"><small>${esc(p.small)}</small>${esc(p.label)}</span><span class="stem"></span><span class="dot"></span></div>`; }).join('');
   const tags = ['s2.when', 's2.report', 's3.length'].filter(k => stopOf(k) === s && G.picks[k]?.length).map(k => `<span class="chipv">${esc((k === 's2.report' ? 'Report here: ' : k === 's2.when' ? 'Used: ' : 'Meetings: ') + G.picks[k].map(id => OPT[id].label).join(', '))}</span>`);
   $('#tags').innerHTML = tags.join('');
@@ -244,10 +257,14 @@ function status(s, kind, text) {
 function paintViewport(s, animate) {
   const vp = $('#vp'); if (!vp || stopOf(D.steps[G.i]?.step || '') !== s) return;
   vp.querySelectorAll('.vp-img,.blueprint').forEach(e => e.remove());
-  if (G.img[s]) { const im = new Image(); im.className = 'vp-img' + (animate ? ' wipe' : ''); im.alt = 'Your ' + STOPS.find(x => x.k === s).n.replace('My ', ''); im.src = G.img[s]; vp.prepend(im);
+  const bc = $('#bc'); if (bc && window.Builder) Builder.draw(bc, s, G.picks, G.born);
+  const showRender = G.view[s] === 'render' && G.img[s];
+  $('#vtog').innerHTML = `<button type="button" class="gbtn sm ${showRender ? 'navy' : 'blue'}" data-v="3d">3D BUILD</button><button type="button" class="gbtn sm ${showRender ? 'blue' : 'navy'}" data-v="render" ${G.img[s] ? '' : 'disabled title="Appears when the image model has rendered this stop"'}>AI RENDER</button>`;
+  $('#vtog').onclick = e => { const b = e.target.closest('[data-v]'); if (!b || b.disabled) return; G.view[s] = b.dataset.v; paintViewport(s); };
+  if (showRender) { const im = new Image(); im.className = 'vp-img' + (animate ? ' wipe' : ''); im.alt = 'Your ' + STOPS.find(x => x.k === s).n.replace('My ', ''); im.src = G.img[s]; vp.prepend(im);
     if (animate) { $('#flash').classList.remove('go'); void vp.offsetWidth; $('#flash').classList.add('go'); } }
-  else vp.insertAdjacentHTML('afterbegin', blueprint(s));
   const st = G.status[s]; status(s, st?.kind, st?.text);
+  pins(s);
 }
 function blueprint(s) {
   return `<div class="blueprint"><svg viewBox="0 0 800 450" aria-hidden="true"><g fill="none" stroke="#9fb3d1" stroke-width="2">
@@ -303,10 +320,10 @@ async function build(s) {
   const L = D.diorama.layouts.find(l => l.option === lid);
   if (!Img.isOffline() && !Img.canEdit()) {   // generate-only model: render the whole stage in one go, same camera prompt, fixed seed
     const f = await Img.fileImage(L.id), anyEdits = EDIT_STEPS.some(k => stopOf(k) === s && G.done.has(k) && describe(k));
-    if (f && !anyEdits) { G.img[s] = f; status(s, null); paintViewport(s, true); return; }
+    if (f && !anyEdits) { G.img[s] = f; G.view[s] = 'render'; status(s, null); paintViewport(s, true); return; }
     status(s, 'busy', anyEdits ? 'Rendering your ' + STOPS.find(x => x.k === s).n.replace('My ', '') + '…' : 'Setting up ' + OPT[lid].label + '…');
     try { const r = await Img.run({prompt: scenePrompt(s), refs: [], refKeys: []}); if (ver !== G.ver[s]) return;
-      G.img[s] = r.url; G.imgKey[s] = Img.hash(scenePrompt(s)); if (!anyEdits) { Img.cachePut('base:' + L.id, r.url); saveToServer(L.id, r.url); }
+      G.img[s] = r.url; G.view[s] = 'render'; G.imgKey[s] = Img.hash(scenePrompt(s)); if (!anyEdits) { Img.cachePut('base:' + L.id, r.url); saveToServer(L.id, r.url); }
       status(s, null); paintViewport(s, true); }
     catch (e) { if (ver === G.ver[s]) { status(s, 'err', e.message.slice(0, 220)); paintViewport(s); } }
     return;
@@ -315,19 +332,19 @@ async function build(s) {
   let base;
   try { base = await layoutImage(L); } catch (e) { if (ver === G.ver[s]) { status(s, 'err', 'Image model: ' + e.message); paintViewport(s); } return; }
   if (ver !== G.ver[s]) return;
-  if (!base) { G.img[s] = null; status(s, 'info', 'Offline: pins only'); paintViewport(s); return; }
-  if (G.img[s] !== base.url) { G.img[s] = base.url; paintViewport(s, true); }
+  if (!base) { G.img[s] = null; status(s, 'info', '3D build · connect an image model for photo renders'); paintViewport(s); return; }
+  if (G.img[s] !== base.url) { G.img[s] = base.url; G.view[s] = 'render'; paintViewport(s, true); }
   let img = base.url, key = base.key;
   for (const k of EDIT_STEPS.filter(k => stopOf(k) === s && G.done.has(k))) {
     const ins = instruction(k); if (!ins) continue;
-    if (Img.isOffline()) { status(s, 'info', 'Offline: pins only'); return; }
+    if (Img.isOffline()) { status(s, 'info', '3D build · connect an image model for photo renders'); return; }
     if (!img.startsWith('data:')) { status(s, 'err', 'Start the game with Start Game to edit images'); return; }
     status(s, 'busy', 'Building ' + (SHORT[k] || '').toLowerCase() + '…');
     const prompt = `Edit this image of an office diorama. ${ins} ${D.diorama.keep}`;
     try { const r = await Img.run({prompt, refs: [img], refKeys: [key]}); key = Img.hash(key + '|' + prompt); img = r.url; }
     catch (e) { if (ver === G.ver[s]) status(s, 'err', e.message.slice(0, 140)); return; }
     if (ver !== G.ver[s]) return;
-    G.img[s] = img; paintViewport(s, true);
+    G.img[s] = img; G.view[s] = 'render'; paintViewport(s, true);
   }
   G.imgKey[s] = key; status(s, null);
 }
@@ -335,13 +352,13 @@ async function saveToServer(id, url) { if (await Img.hasServer()) fetch('api/sav
 
 // ============================================================ close: three stops side by side
 function triptych() {
-  return `<div class="blueprint" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px;align-items:center">${STOPS.map(x => G.img[x.k]
-    ? `<img src="${G.img[x.k]}" alt="${esc(x.n)}" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;box-shadow:0 4px 0 #0a2a6b">`
+  return `<div class="blueprint" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px;align-items:center">${STOPS.map(x => shot(x.k)
+    ? `<img src="${shot(x.k)}" alt="${esc(x.n)}" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;box-shadow:0 4px 0 #0a2a6b">`
     : `<div style="aspect-ratio:16/9;border-radius:12px;background:#dfe7f2;display:grid;place-items:center;font:400 18px var(--display);color:#5a6b86">${esc(x.n)}</div>`).join('')}</div>`;
 }
 function favCards() {
   return STOPS.map((x, j) => { const id = 'close.favourite.' + x.k, on = G.picks['close.favourite'].includes(id);
-    return `<button type="button" class="opt" data-id="${id}" aria-pressed="${on}" style="animation-delay:${j * 60}ms"><div class="th">${G.img[x.k] ? `<img src="${G.img[x.k]}" alt="">` : svg(['desk', 'cup', 'room'][j])}</div>
+    return `<button type="button" class="opt" data-id="${id}" aria-pressed="${on}" style="animation-delay:${j * 60}ms"><div class="th">${shot(x.k) ? `<img src="${shot(x.k)}" alt="" style="object-fit:contain;background:#eef2f8">` : svg(['desk', 'cup', 'room'][j])}</div>
       <span class="tick">${svg('check', '#fff', 6)}</span><span class="nm">${esc(x.n)}</span><span class="ds">${esc(x.sub)}</span></button>`; }).join('');
 }
 function favStop() { return (pick1('close.favourite') || 'close.favourite.s1').split('.').pop(); }
@@ -381,14 +398,14 @@ async function final(again) {
     <div class="frame" id="frame"><div class="wait"><span class="dt" style="font-size:28px">RENDERING…</span><div class="bar"><i></i></div><span style="color:#cfe0ff;font-weight:800">A photoreal render of your picks. About 20 to 60 seconds.</span></div></div>
     <div class="row" id="frow" hidden><button class="gbtn navy" id="again" type="button">RENDER AGAIN</button><button class="gbtn green big" id="all" type="button">SEE ALL</button></div></div></section>`;
   saveSession();
-  const ref = Img.canEdit() && G.img[s] && G.img[s].startsWith('data:') ? G.img[s] : null;
+  const sh = shot(s), ref = Img.canEdit() && sh && sh.startsWith('data:') ? sh : null;
   const prompt = finalPrompt(s, !!ref) + (again ? ` Variation ${Date.now() % 1000}.` : '');
   let ok = false;
   if (!Img.isOffline()) {
     try { const r = await Img.run({prompt, refs: ref ? [ref] : [], refKeys: ref ? [G.imgKey[s] || 'img'] : []}); G.final = r.url; ok = true; }
     catch (e) { $('#frame').innerHTML = `<div class="wait"><span class="dt sm" style="font-size:24px">The render didn’t come back</span><span style="font-weight:800">${esc(e.message.slice(0, 200))}</span><button class="gbtn sm" id="fix" type="button">OPEN SETTINGS</button></div>`; $('#fix').onclick = settings; }
   } else {
-    $('#frame').innerHTML = `<div class="wait">${G.img[s] ? `<img src="${G.img[s]}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#eef2f8">` : ''}<span class="dt sm" style="font-size:22px;position:relative">Offline mode</span><button class="gbtn sm" id="fix" type="button" style="position:relative">ADD AN IMAGE MODEL</button></div>`; $('#fix').onclick = settings;
+    $('#frame').innerHTML = `<div class="wait">${shot(s) ? `<img src="${shot(s)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#eef2f8">` : ''}<span class="dt sm" style="font-size:22px;position:relative">Offline mode</span><button class="gbtn sm" id="fix" type="button" style="position:relative">ADD AN IMAGE MODEL</button></div>`; $('#fix').onclick = settings;
   }
   if (ok) { $('#frame').innerHTML = `<img class="vp-img wipe" src="${G.final}" alt="Photoreal render of ${esc(n)}">`; confetti(180); }
   $('#frow').hidden = false;
@@ -403,8 +420,8 @@ function results() {
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><h1 class="logo" style="margin:0;text-align:left"><span class="l1">${esc(G.name)}, master of</span><span class="l2" style="font-size:clamp(40px,6vw,76px)">Your Universe</span></h1>
       <div style="margin-left:auto" class="row"><button class="gbtn navy" id="set" type="button">SETTINGS</button><button class="gbtn green" id="again" type="button">PLAY AGAIN</button></div></div>
     ${G.final ? `<div class="frame"><img src="${G.final}" alt="Photoreal render of your favourite stop"></div><div class="row">${dl(G.final, 'my-future-' + favStop())}</div>` : ''}
-    <div class="rgrid">${STOPS.map(x => `<div class="rcard">${G.img[x.k] ? `<img src="${G.img[x.k]}" alt="${esc(x.n)}">` : '<div class="ph">Built with pins only</div>'}
-      <div class="rc"><h3>${esc(x.n)}${favStop() === x.k ? ' ★' : ''}</h3><div class="chips">${chips(x.k)}</div>${dl(G.img[x.k], 'my-' + x.k)}</div></div>`).join('')}</div>
+    <div class="rgrid">${STOPS.map(x => `<div class="rcard">${shot(x.k) ? `<img src="${shot(x.k)}" alt="${esc(x.n)}">` : '<div class="ph">Not built</div>'}
+      <div class="rc"><h3>${esc(x.n)}${favStop() === x.k ? ' ★' : ''}</h3><div class="chips">${chips(x.k)}</div>${dl(shot(x.k), 'my-' + x.k)}</div></div>`).join('')}</div>
     <div class="rcard"><div class="rc"><h3>What matters most</h3><div class="chips">${chips('close')}</div></div></div>
   </div></section>`;
   $('#set').onclick = settings;
@@ -490,6 +507,7 @@ function exportCsv() {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv'})); a.download = 'master-of-your-universe-sessions.csv'; a.click();
 }
 
+addEventListener('resize', () => { const st = D.steps[G.i]; if (st && stopOf(st.step) !== 'close' && $('#bc')) paintViewport(stopOf(st.step)); });
 addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) { $('#modal').hidden = true; $('#modal').innerHTML = ''; } });
 title();
 })();
