@@ -1831,6 +1831,175 @@ window.GAME_DATA = {
  },
  "freeTextEdit": "Also add, where it fits best: {text}.",
  "final": "Turn this axonometric diorama into a photorealistic eye-level interior photograph of the same space, as if standing inside it. Keep every piece of furniture, its material, colour and position from the diorama. Remove the plinth and the studio background: it becomes a real room in a newly completed engineering office in Gyeonggi-do, South Korea, with floor-to-ceiling windows, white-painted exposed concrete ceiling with linear LED lights, and distant green hills outside. ",
+ "copy": {
+  "s1.cluster": {
+   "title": "How should your team sit?",
+   "sub": "One setup for eight people.",
+   "button": "PLACE IT"
+  },
+  "s1.desk": {
+   "title": "Make your desk yours",
+   "sub": "Up to 3 things you'd want within reach.",
+   "button": "NEXT"
+  },
+  "s1.hood": {
+   "title": "What's around your team?",
+   "sub": "The spaces next to your desks.",
+   "button": "NEXT"
+  },
+  "s1.near": {
+   "title": "What should be close by?",
+   "sub": "Up to 4. Choose what you'd really use.",
+   "button": "FINISH THIS SPACE"
+  },
+  "s2.cafe": {
+   "title": "What should the café become?",
+   "sub": "Busy at breakfast, quiet after. Change that.",
+   "button": "PLACE IT"
+  },
+  "s2.seat": {
+   "title": "Where would you sit?",
+   "sub": "Up to 3.",
+   "button": "NEXT"
+  },
+  "s2.fun": {
+   "title": "How do you switch off?",
+   "sub": "Up to 3.",
+   "button": "NEXT"
+  },
+  "s2.work": {
+   "title": "What makes it work?",
+   "sub": "Up to 3.",
+   "button": "NEXT"
+  },
+  "s2.next": {
+   "title": "Add one room next door",
+   "sub": "Pick 1.",
+   "button": "NEXT"
+  },
+  "s2.when": {
+   "title": "When would you come here?",
+   "sub": "Pick all that apply.",
+   "button": "NEXT"
+  },
+  "s2.report": {
+   "title": "Would you write your site report here?",
+   "sub": "With your team, after a customer visit.",
+   "button": "NEXT"
+  },
+  "s3.room": {
+   "title": "When your team meets, what fits best?",
+   "sub": "Pick 1.",
+   "button": "PLACE IT"
+  },
+  "s3.length": {
+   "title": "How long do your meetings usually run?",
+   "sub": "Pick 1.",
+   "button": "NEXT"
+  },
+  "s3.kit": {
+   "title": "What does the room need?",
+   "sub": "Up to 3.",
+   "button": "FINISH THIS SPACE"
+  },
+  "close.productive": {
+   "title": "What would help you most at work?",
+   "sub": "Pick 1.",
+   "button": "NEXT"
+  },
+  "close.favourite": {
+   "title": "Which space would change your day?",
+   "sub": "We'll make a photo of it.",
+   "button": "THIS ONE"
+  }
+ },
+ "reportOthers": {
+  "title": "Would you work here with your team?",
+  "sub": ""
+ },
+ "benefit": {
+  "s1.cluster.cocoon": "Curved screens cut noise",
+  "s1.cluster.pinwheel": "Back to back, facing out",
+  "s1.cluster.farm": "One long table, the whole team together",
+  "s1.cluster.screened": "Sit or stand, a screen between you",
+  "s1.cluster.focuspod": "A quiet bay for deep work",
+  "s1.cluster.moveit": "On wheels, so the team can rearrange",
+  "s1.desk.baghook": "Your bag off the floor",
+  "s1.desk.accshelf": "Headphones and phone in reach",
+  "s1.desk.shelving": "Files and kit at your side",
+  "s1.desk.heightadj": "Sit or stand at a touch",
+  "s1.desk.whiteboard": "Sketch an idea without leaving",
+  "s1.desk.monitor": "Two screens, more room to work",
+  "s1.desk.nameplate": "Your name, your spot",
+  "s1.desk.smartdesk": "Remembers your height and light",
+  "s1.hood.rooms": "Closed rooms right by your desks",
+  "s1.hood.mix": "Fewer desks, more places to work",
+  "s1.hood.break": "All that, plus a team break corner",
+  "s1.hood.homebase": "A zone that's only your team's",
+  "s1.near.lockers": "A safe spot for your things",
+  "s1.near.writingwall": "Plan on the wall together",
+  "s1.near.mobilewb": "Roll a board to wherever you meet",
+  "s1.near.awards": "Show what the team has done",
+  "s1.near.pinboard": "Notes and news for the team",
+  "s1.near.plants": "Greener and calmer",
+  "s1.near.phonebooth": "Private calls, next to the team",
+  "s1.near.huddlescreen": "Quick stand-ups around a screen",
+  "s1.near.kitstorage": "Tools and kit in one place",
+  "s1.near.purifier": "Cleaner air all day",
+  "s1.near.repairbar": "Fix and prep kit at a proper bench",
+  "s2.cafe.workcafe": "Work tables, coffee and a games corner",
+  "s2.cafe.clubhouse": "Sofas, a big TV and games",
+  "s2.cafe.allday": "Breakfast, then work, then snacks",
+  "s2.cafe.pitstop": "Land, eat and write up by the door",
+  "s2.seat.longtables": "Plug in and spread out",
+  "s2.seat.booths4": "A booth for four",
+  "s2.seat.counter": "Perch by the window",
+  "s2.seat.farm": "Sit together at one big table",
+  "s2.seat.sofas": "Sink in and relax",
+  "s2.seat.focuspod": "Close the door, get it done",
+  "s2.seat.pod4": "A closed pod for four",
+  "s2.seat.terrace": "Fresh air outside",
+  "s2.seat.stepped": "Steps to sit on for team talks",
+  "s2.fun.pool": "A classic after-work game",
+  "s2.fun.foosball": "Fast games for two to four",
+  "s2.fun.pingpong": "Get moving between tasks",
+  "s2.fun.chess": "A quiet game of strategy",
+  "s2.fun.puzzles": "Board games and puzzles to share",
+  "s2.fun.tv": "Music or the match on a big screen",
+  "s2.fun.videogame": "Consoles for a team game",
+  "s2.work.charging": "Power at every seat",
+  "s2.work.mobileboards": "Boards that roll to your table",
+  "s2.work.sharescreen": "Share your laptop with the team",
+  "s2.work.coffeebar": "Good coffee, close by",
+  "s2.work.pantry": "Snacks when you need them",
+  "s2.work.lockers": "Drop your kit by the door",
+  "s2.work.purifier": "Cleaner air in the café",
+  "s2.next.wellness": "A quiet room to reset",
+  "s2.next.massage": "Massage chairs to unwind",
+  "s2.next.showers": "Freshen up after the site",
+  "s2.next.fitness": "A quick workout nearby",
+  "s2.next.mothers": "A private, comfortable room",
+  "s2.next.plantroom": "A green room to breathe",
+  "s3.room.booth": "Calls and one-to-ones",
+  "s3.room.four": "A small closed room with a screen",
+  "s3.room.mid": "Room for a project group",
+  "s3.room.twelve": "The whole team around one table",
+  "s3.room.huddle": "A half-open pod by your desks",
+  "s3.room.flexi": "Meetings by day, ping-pong after",
+  "s3.kit.video": "Clear calls with overseas teams",
+  "s3.kit.writingwall": "Sketch it out together",
+  "s3.kit.standing": "Short, focused stand-ups",
+  "s3.kit.soft": "Relaxed seats for easy talks",
+  "s3.kit.daylight": "Natural light all day",
+  "s3.kit.sound": "Talk without being overheard",
+  "s3.kit.purifier": "Fresh air in long meetings",
+  "s3.kit.pinup": "Pin up the week's work"
+ },
+ "nameFix": {
+  "s3.room.booth": "Phone booth",
+  "s3.room.mid": "Mid room",
+  "close.favourite.s2": "My café"
+ },
  "verbs": {
   "s2.cafe.workcafe": "work · meet · play",
   "s2.cafe.clubhouse": "relax · watch · play",

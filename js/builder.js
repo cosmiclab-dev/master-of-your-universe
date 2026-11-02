@@ -250,62 +250,117 @@ function drawBoxes(ctx, boxes, pr, now, afterBase) {
   ctx.globalAlpha = 1;
 }
 
-const ZB = {s1: [0, 0, 13.3, 14], s2: [13.3, 0, 23.3, 14], s3: [23.3, 0, 30, 14]};
-const FLOOR = {s1: '#d2cdc4', s2: '#ddd2bf', s3: '#d3d6d8'};
-function scene(stop, picks, free) {
-  OUT = []; TAG = 'base'; PICKS = picks || {};
+const ZB = {s1: [0, 0, 13.3, 14], s2: [13.3, 0, 23.3, 14], s3: [23.3, 0, 30, 14], all: [0, 0, 30, 14]};
+const FLOOR = {s1: '#d4cec4', s2: '#ddd1bc', s3: '#d5d8da'};
+// where each step drops its items (for the dashed drop zones)
+const ZONE = {'s1.cluster': {x: 2.4, y: 4, w: 8.6, d: 5.6}, 's1.hood': {x: 0.4, y: 0.4, w: 12.5, d: 13.2}, 's2.cafe': {x: 13.9, y: 0.4, w: 6.1, d: 6.4},
+  's2.next': {x: 20.2, y: 0.4, w: 2.8, d: 4.2}, 's3.room': {x: 23.8, y: 2.5, w: 5.8, d: 6.3}};
+function shell(zone) {
+  const [x0, y0, x1, y1] = ZB[zone];
+  flat(x0, y0, x1 - x0, y1 - y0, FLOOR[zone] || FLOOR.s1, 0.01);
+  for (let x = x0 + 1; x < x1 - 1; x += 3) flat(x, 0.2, 1.4, 2.6, 'rgba(255,236,190,0.28)', 0.013);   // daylight pools from the windows
+  plant(x1 - 0.8, y1 - 0.9, 1.3);
+}
+function scene(stop, picks, ghost) {
+  OUT = []; TAG = 'base'; PICKS = {...(picks || {})};
+  if (ghost) { const k = ghost.k; PICKS[k] = ghost.max === 1 ? [ghost.id] : [...(PICKS[k] || []).filter(i => i !== ghost.id), ghost.id]; }
   FLAGS = {}; (PICKS['s1.desk'] || []).forEach(id => FLAGS[id.split('.').pop()] = true);
   const [x0, y0, x1, y1] = ZB[stop];
   B(x0 - 0.5, y0 - 0.5, -0.45, x1 - x0 + 1, y1 - y0 + 1, 0.45, '#dcdad5', {layer: 1, ord: 0});
-  flat(x0, y0, x1 - x0, y1 - y0, FLOOR[stop], 0.01);
+  (stop === 'all' ? ['s1', 's2', 's3'] : [stop]).forEach(shell);
   for (let x = x0; x < x1 - 0.1; x += 1.5) { const w = Math.min(1.5, x1 - x); B(x, y0, 0, 0.07, 0.1, 2.6, P.char); B(x + 0.07, y0 + 0.02, 0, w - 0.07, 0.06, 2.6, P.glass); }
   B(x0, y0, 0, 0.12, y1 - y0, 2.6, '#e9e7e2');
+  if (stop === 'all') { B(13.15, 6.8, 0, 0.4, 0.4, 2.6, '#ecebe6'); B(23.15, 6.8, 0, 0.4, 0.4, 2.6, '#ecebe6'); }
   const run = (id, arg) => { if (R[id]) withTag(id, () => R[id](arg)); };
   const one = k => PICKS[k]?.[0] && run(PICKS[k][0]);
   const slots = (k, list) => (PICKS[k] || []).forEach((id, i) => list[i] && run(id, list[i]));
-  if (stop === 's1') { one('s1.cluster'); one('s1.hood'); slots('s1.near', NEAR); }
-  if (stop === 's2') { one('s2.cafe'); one('s2.next'); slots('s2.seat', SEAT); slots('s2.fun', FUN); slots('s2.work', WORK); }
-  if (stop === 's3') { one('s3.room'); (PICKS['s3.kit'] || []).forEach(id => run(id)); }
+  const has = z => stop === 'all' || stop === z;
+  if (has('s1')) { one('s1.cluster'); one('s1.hood'); slots('s1.near', NEAR); }
+  if (has('s2')) { one('s2.cafe'); one('s2.next'); slots('s2.seat', SEAT); slots('s2.fun', FUN); slots('s2.work', WORK); }
+  if (has('s3')) { one('s3.room'); (PICKS['s3.kit'] || []).forEach(id => run(id)); }
+  if (ghost) OUT.forEach(b => { if (b.tag === ghost.id || (ghost.k === 's1.desk' && b.tag === ghost.id)) b.a = 0.42; });
   return OUT;
 }
-function camFor(stop, W, H) {
+function camFor(stop, W, H, pad = 0.84) {
   const [x0, y0, x1, y1] = ZB[stop];
   const pts = [[x0 - .5, y0 - .5, 2.8], [x1 + .5, y0 - .5, 2.8], [x1 + .5, y1 + .5, -.45], [x0 - .5, y1 + .5, -.45], [x0 - .5, y0 - .5, -.45], [x1 + .5, y1 + .5, 2.8]].map(([x, y, z]) => [(x - y) * 0.866, (x + y) * 0.5 - z]);
   const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]), mnx = Math.min(...xs), mxx = Math.max(...xs), mny = Math.min(...ys), mxy = Math.max(...ys);
-  const s = Math.min(W * 0.86 / (mxx - mnx), H * 0.82 / (mxy - mny));
+  const s = Math.min(W * pad / (mxx - mnx), H * pad / (mxy - mny));
   return {x: (mnx + mxx) / 2, y: (mny + mxy) / 2 - 0.2, s};
 }
-function paint(ctx, W, H, stop, picks, now) {
-  const g = ctx.createRadialGradient(W / 2, H * 0.42, 0, W / 2, H * 0.42, W * 0.75); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#dfe4ec');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  const boxes = scene(stop, picks), cam = camFor(stop, W, H), pr = projector(cam, W, H), [x0, y0, x1, y1] = ZB[stop];
+function zoneRect(ctx, pr, r, color, dash, t) {
+  ctx.save(); ctx.setLineDash(dash ? [7, 6] : []); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.fillStyle = color.replace(/[\d.]+\)$/, '0.08)');
+  ctx.beginPath(); [[r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.d], [r.x, r.y + r.d]].forEach(([x, y], i) => { const p = pr(x, y, 0.03); i ? ctx.lineTo(...p) : ctx.moveTo(...p); }); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+}
+function paint(ctx, W, H, stop, picks, now, o = {}) {
+  const g = ctx.createRadialGradient(W / 2, H * 0.42, 0, W / 2, H * 0.42, W * 0.75); g.addColorStop(0, o.bg0 || '#ffffff'); g.addColorStop(1, o.bg1 || '#dfe4ec');
+  if (o.clear) ctx.clearRect(0, 0, W, H); else { ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+  const boxes = scene(stop, picks, o.ghost), cam = camFor(stop, W, H, o.pad);
+  if (o.drift) cam.x += Math.sin((now || 0) / 4000) * 0.6;
+  const pr = projector(cam, W, H), [x0, y0, x1, y1] = ZB[stop];
   const c = pr((x0 + x1) / 2, (y0 + y1) / 2, -0.6); ctx.save(); ctx.filter = 'blur(18px)'; ctx.fillStyle = 'rgba(30,40,60,0.18)'; ctx.beginPath(); ctx.ellipse(c[0], c[1] + cam.s * 0.6, cam.s * (x1 - x0 + y1 - y0) * 0.48, cam.s * (x1 - x0 + y1 - y0) * 0.17, 0, 0, 7); ctx.fill(); ctx.restore();
   drawBoxes(ctx, boxes, pr, now, () => {
     ctx.strokeStyle = '#2fc3e8'; ctx.lineWidth = 2; ctx.beginPath();
     [[x0 - .5, y1 + .5], [x1 + .5, y1 + .5], [x1 + .5, y0 - .5]].forEach(([x, y], i) => { const p = pr(x, y, 0); i ? ctx.lineTo(...p) : ctx.moveTo(...p); }); ctx.stroke();
+    (o.zones || []).forEach(r => zoneRect(ctx, pr, r, 'rgba(20,116,224,0.9)', true, now));
+    (o.glow || []).forEach(z => { const [a, b, c2, d] = ZB[z]; zoneRect(ctx, pr, {x: a + .15, y: b + .15, w: c2 - a - .3, d: d - b - .3}, 'rgba(250,198,2,0.95)', true, now); });
   });
   return {boxes, pr};
 }
-let loop = null; const SNAP = new Map();
+// the next free spot(s) for a step, so the player sees where things will land
+function zonesFor(k, picks) {
+  const n = (picks[k] || []).length;
+  if (ZONE[k]) return k === 's3.room' && picks[k]?.[0] ? [] : [ZONE[k]];
+  const L = {'s1.near': NEAR, 's2.seat': SEAT, 's2.fun': FUN, 's2.work': WORK}[k];
+  if (L) return L[n] ? [L[n]] : [];
+  if (k === 's3.kit') { const r = ROOMS[picks['s3.room']?.[0]] || ROOMS['s3.room.four']; return [{x: r[0], y: r[1], w: r[2] - r[0], d: r[3] - r[1]}]; }
+  return [];
+}
+let loop = null; const SNAP = new Map(), ICONS = new Map();
+function sizeCanvas(canvas) { const dpr = Math.min(2, devicePixelRatio || 1), W = canvas.clientWidth || 960, H = canvas.clientHeight || 540;
+  if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) { canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); } return {dpr, W, H}; }
 const Builder = {
-  // draw into a canvas; animates newly placed items (born = {optionId: time})
-  draw(canvas, stop, picks, born) {
-    BORN = born || {};
-    const dpr = Math.min(2, devicePixelRatio || 1), W = canvas.clientWidth || 960, H = canvas.clientHeight || 540;
-    if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) { canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); }
-    const ctx = canvas.getContext('2d'); cancelAnimationFrame(loop);
-    const frame = () => { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); const now = performance.now(); const r = paint(ctx, W, H, stop, picks, now); Builder.last = {r, W, H};
-      if (Object.values(BORN).some(t => now - t < 700) && document.body.contains(canvas)) loop = requestAnimationFrame(frame); };
+  // live stop view: o = {step, ghost:{k,id,max}}; born = {optionId: time} animates new items
+  draw(canvas, stop, picks, born, o = {}) {
+    BORN = born || {}; const {dpr, W, H} = sizeCanvas(canvas), ctx = canvas.getContext('2d'); cancelAnimationFrame(loop); clearTimeout(loop);
+    const frame = () => { if (!document.body.contains(canvas)) return; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); const now = performance.now();
+      const r = paint(ctx, W, H, stop, picks, now, {zones: o.step ? zonesFor(o.step, picks) : [], ghost: o.ghost, pad: 0.93}); Builder.last = {r, W, H};
+      if (Object.values(BORN).some(t => now - t < 700)) loop = requestAnimationFrame(frame); };
     frame();
   },
-  // where an item sits on screen, in % of the canvas, for its pin
+  // whole floor: title drift, onboarding and route map
+  floor(canvas, picks, o = {}) {
+    const {dpr, W, H} = sizeCanvas(canvas), ctx = canvas.getContext('2d'); cancelAnimationFrame(loop); clearTimeout(loop); BORN = o.born || {};
+    const frame = () => { if (!document.body.contains(canvas)) return; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); const now = performance.now();
+      const glow = typeof o.glow === 'function' ? o.glow(now) : o.glow;
+      paint(ctx, W, H, 'all', picks, now, {drift: o.drift, glow, clear: o.clear, pad: o.pad || 0.9}); if (o.drift || typeof o.glow === 'function' || Object.values(BORN).some(t => now - t < 700)) loop = setTimeout(() => requestAnimationFrame(frame), 33); };
+    frame();
+  },
+  stop() { cancelAnimationFrame(loop); clearTimeout(loop); },
   anchor(tags) {
     const L = Builder.last; if (!L) return null;
-    const bs = L.r.boxes.filter(b => tags.some(t => b.tag === t || b.tag.startsWith(t + '.'))); if (!bs.length) return null;
+    const bs = L.r.boxes.filter(b => b.a !== 0.42 && tags.some(t => b.tag === t)); if (!bs.length) return null;
     let sx = 0, sy = 0, top = Infinity; for (const b of bs) { const p = L.r.pr(b.x + b.w / 2, b.y + b.d / 2, b.z + b.h); sx += p[0]; sy += p[1]; top = Math.min(top, p[1]); }
     return {x: sx / bs.length / L.W * 100, y: (top + (sy / bs.length - top) * 0.3) / L.H * 100};
   },
-  snapshot(stop, picks, w = 1280, h = 720) { const key = stop + JSON.stringify(Object.entries(picks).filter(([k]) => k.startsWith(stop + '.'))); if (SNAP.has(key)) return SNAP.get(key); const c = document.createElement('canvas'); c.width = w; c.height = h; BORN = {}; paint(c.getContext('2d'), w, h, stop, picks, null); const u = c.toDataURL('image/jpeg', 0.9); SNAP.set(key, u); return u; },
+  snapshot(stop, picks, w = 1280, h = 720) { const key = stop + JSON.stringify(Object.entries(picks).filter(([k]) => stop === 'all' || k.startsWith(stop + '.'))); if (SNAP.has(key)) return SNAP.get(key);
+    const c = document.createElement('canvas'); c.width = w; c.height = h; BORN = {}; paint(c.getContext('2d'), w, h, stop, picks, null); const u = c.toDataURL('image/jpeg', 0.9); SNAP.set(key, u); return u; },
+  // a unique 3D thumbnail for one catalog option
+  icon(id) {
+    if (ICONS.has(id)) return ICONS.get(id); if (!R[id]) return null;
+    const saveF = FLAGS; OUT = []; TAG = id; PICKS = {}; FLAGS = id.startsWith('s1.desk.') ? {[id.split('.').pop()]: true} : {};
+    const rect = id.startsWith('s1.near.') ? {x: 0, y: 0, w: 3, d: 0.9} : id.startsWith('s2.work.') ? {x: 0, y: 0, w: 2.8, d: 0.7} : {x: 0, y: 0, w: 2.8, d: 2.8};
+    if (id.startsWith('s3.kit.')) { PICKS = {'s3.room': ['s3.room.four']}; withTag('room', () => R['s3.room.four']()); R[id](); OUT.forEach(b => { if (b.tag === 'room') b.a = 0.3; }); }
+    else R[id](rect);
+    const boxes = OUT; FLAGS = saveF;
+    const pts = []; boxes.forEach(b => [[b.x, b.y, b.z], [b.x + b.w, b.y + b.d, b.z + b.h], [b.x + b.w, b.y, b.z], [b.x, b.y + b.d, b.z + b.h], [b.x, b.y + b.d, b.z], [b.x + b.w, b.y, b.z + b.h]].forEach(([x, y, z]) => pts.push([(x - y) * 0.866, (x + y) * 0.5 - z])));
+    const mnx = Math.min(...pts.map(p => p[0])), mxx = Math.max(...pts.map(p => p[0])), mny = Math.min(...pts.map(p => p[1])), mxy = Math.max(...pts.map(p => p[1]));
+    const cw = 360, ch = 225, s = Math.min((cw - 40) / (mxx - mnx), (ch - 40) / (mxy - mny), 120);
+    const c = document.createElement('canvas'); c.width = cw; c.height = ch; const g = c.getContext('2d');
+    const bg = g.createRadialGradient(cw / 2, ch * 0.45, 0, cw / 2, ch * 0.45, cw * 0.6); bg.addColorStop(0, '#ffffff'); bg.addColorStop(1, '#e3e8ef'); g.fillStyle = bg; g.fillRect(0, 0, cw, ch);
+    BORN = {}; drawBoxes(g, boxes, projector({x: (mnx + mxx) / 2, y: (mny + mxy) / 2, s}, cw, ch), null);
+    const u = c.toDataURL('image/jpeg', 0.88); ICONS.set(id, u); return u;
+  },
 };
 window.Builder = Builder;
 })();

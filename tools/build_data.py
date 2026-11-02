@@ -70,6 +70,52 @@ EDIT = {
 }
 FREE_TEXT_EDIT = "Also add, where it fits best: {text}."
 
+
+# ------------------------------------------------------------------ player copy (written for the game, for Korean HR review)
+COPY = {
+ "s1.cluster": ("How should your team sit?", "One setup for eight people.", "PLACE IT"),
+ "s1.desk": ("Make your desk yours", "Up to 3 things you'd want within reach.", "NEXT"),
+ "s1.hood": ("What's around your team?", "The spaces next to your desks.", "NEXT"),
+ "s1.near": ("What should be close by?", "Up to 4. Choose what you'd really use.", "FINISH THIS SPACE"),
+ "s2.cafe": ("What should the café become?", "Busy at breakfast, quiet after. Change that.", "PLACE IT"),
+ "s2.seat": ("Where would you sit?", "Up to 3.", "NEXT"),
+ "s2.fun": ("How do you switch off?", "Up to 3.", "NEXT"),
+ "s2.work": ("What makes it work?", "Up to 3.", "NEXT"),
+ "s2.next": ("Add one room next door", "Pick 1.", "NEXT"),
+ "s2.when": ("When would you come here?", "Pick all that apply.", "NEXT"),
+ "s2.report": ("Would you write your site report here?", "With your team, after a customer visit.", "NEXT"),
+ "s3.room": ("When your team meets, what fits best?", "Pick 1.", "PLACE IT"),
+ "s3.length": ("How long do your meetings usually run?", "Pick 1.", "NEXT"),
+ "s3.kit": ("What does the room need?", "Up to 3.", "FINISH THIS SPACE"),
+ "close.productive": ("What would help you most at work?", "Pick 1.", "NEXT"),
+ "close.favourite": ("Which space would change your day?", "We'll make a photo of it.", "THIS ONE"),
+}
+REPORT_OTHERS = ("Would you work here with your team?", "")
+BENEFIT = {
+ "s1.cluster.cocoon": "Curved screens cut noise", "s1.cluster.pinwheel": "Back to back, facing out", "s1.cluster.farm": "One long table, the whole team together",
+ "s1.cluster.screened": "Sit or stand, a screen between you", "s1.cluster.focuspod": "A quiet bay for deep work", "s1.cluster.moveit": "On wheels, so the team can rearrange",
+ "s1.desk.baghook": "Your bag off the floor", "s1.desk.accshelf": "Headphones and phone in reach", "s1.desk.shelving": "Files and kit at your side", "s1.desk.heightadj": "Sit or stand at a touch",
+ "s1.desk.whiteboard": "Sketch an idea without leaving", "s1.desk.monitor": "Two screens, more room to work", "s1.desk.nameplate": "Your name, your spot", "s1.desk.smartdesk": "Remembers your height and light",
+ "s1.hood.rooms": "Closed rooms right by your desks", "s1.hood.mix": "Fewer desks, more places to work", "s1.hood.break": "All that, plus a team break corner", "s1.hood.homebase": "A zone that's only your team's",
+ "s1.near.lockers": "A safe spot for your things", "s1.near.writingwall": "Plan on the wall together", "s1.near.mobilewb": "Roll a board to wherever you meet", "s1.near.awards": "Show what the team has done",
+ "s1.near.pinboard": "Notes and news for the team", "s1.near.plants": "Greener and calmer", "s1.near.phonebooth": "Private calls, next to the team", "s1.near.huddlescreen": "Quick stand-ups around a screen",
+ "s1.near.kitstorage": "Tools and kit in one place", "s1.near.purifier": "Cleaner air all day", "s1.near.repairbar": "Fix and prep kit at a proper bench",
+ "s2.cafe.workcafe": "Work tables, coffee and a games corner", "s2.cafe.clubhouse": "Sofas, a big TV and games", "s2.cafe.allday": "Breakfast, then work, then snacks", "s2.cafe.pitstop": "Land, eat and write up by the door",
+ "s2.seat.longtables": "Plug in and spread out", "s2.seat.booths4": "A booth for four", "s2.seat.counter": "Perch by the window", "s2.seat.farm": "Sit together at one big table", "s2.seat.sofas": "Sink in and relax",
+ "s2.seat.focuspod": "Close the door, get it done", "s2.seat.pod4": "A closed pod for four", "s2.seat.terrace": "Fresh air outside", "s2.seat.stepped": "Steps to sit on for team talks",
+ "s2.fun.pool": "A classic after-work game", "s2.fun.foosball": "Fast games for two to four", "s2.fun.pingpong": "Get moving between tasks", "s2.fun.chess": "A quiet game of strategy",
+ "s2.fun.puzzles": "Board games and puzzles to share", "s2.fun.tv": "Music or the match on a big screen", "s2.fun.videogame": "Consoles for a team game",
+ "s2.work.charging": "Power at every seat", "s2.work.mobileboards": "Boards that roll to your table", "s2.work.sharescreen": "Share your laptop with the team", "s2.work.coffeebar": "Good coffee, close by",
+ "s2.work.pantry": "Snacks when you need them", "s2.work.lockers": "Drop your kit by the door", "s2.work.purifier": "Cleaner air in the café",
+ "s2.next.wellness": "A quiet room to reset", "s2.next.massage": "Massage chairs to unwind", "s2.next.showers": "Freshen up after the site", "s2.next.fitness": "A quick workout nearby",
+ "s2.next.mothers": "A private, comfortable room", "s2.next.plantroom": "A green room to breathe",
+ "s3.room.booth": "Calls and one-to-ones", "s3.room.four": "A small closed room with a screen", "s3.room.mid": "Room for a project group", "s3.room.twelve": "The whole team around one table",
+ "s3.room.huddle": "A half-open pod by your desks", "s3.room.flexi": "Meetings by day, ping-pong after",
+ "s3.kit.video": "Clear calls with overseas teams", "s3.kit.writingwall": "Sketch it out together", "s3.kit.standing": "Short, focused stand-ups", "s3.kit.soft": "Relaxed seats for easy talks",
+ "s3.kit.daylight": "Natural light all day", "s3.kit.sound": "Talk without being overheard", "s3.kit.purifier": "Fresh air in long meetings", "s3.kit.pinup": "Pin up the week's work",
+}
+NAME_FIX = {"s3.room.booth": "Phone booth", "s3.room.mid": "Mid room", "close.favourite.s2": "My café"}
+
 # ------------------------------------------------------------------ extras from the WIP deck
 VERBS = {"s2.cafe.workcafe": "work · meet · play", "s2.cafe.clubhouse": "relax · watch · play", "s2.cafe.allday": "eat · work · unwind", "s2.cafe.pitstop": "land · eat · write up"}
 DESK_CHIP = {"s1.cluster.cocoon": "1.4 × 0.7 m", "s1.cluster.pinwheel": "1.4 × 0.7 m", "s1.cluster.farm": "1.0 m a seat",
@@ -105,6 +151,8 @@ data = {
     "fixedPin": {k: {"x": x, "y": y} for k, (x, y) in FIXED_PIN.items()},
     "kitPin": {k: {"x": x, "y": y} for k, (x, y) in KIT_PIN.items()},
     "edit": EDIT, "freeTextEdit": FREE_TEXT_EDIT, "final": FINAL,
+    "copy": {k: {"title": t, "sub": u, "button": b} for k, (t, u, b) in COPY.items()}, "reportOthers": {"title": REPORT_OTHERS[0], "sub": REPORT_OTHERS[1]},
+    "benefit": BENEFIT, "nameFix": NAME_FIX,
     "verbs": VERBS, "deskChip": DESK_CHIP, "cost": COST, "budget": BUDGET, "hint": HINT,
 }
 out = ROOT / "js" / "data.js"

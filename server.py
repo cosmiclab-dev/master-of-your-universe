@@ -33,6 +33,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/health": return self.send_json({"ok": True, "server": "local"})
         if self.path == "/api/export.csv": return self.export()
+        if self.path == "/api/sessions": return self.send_json([json.loads(p.read_text()) for p in sorted(SESSIONS.glob("*.json"))])
         return super().do_GET()
 
     def do_POST(self):
