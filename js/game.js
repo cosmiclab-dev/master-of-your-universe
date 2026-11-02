@@ -312,8 +312,8 @@ async function reveal(again) {
     <div class="frame" id="frame"><img id="fimg" src="${G.photo[s]?.url || Builder.snapshot(s, G.picks)}" alt=""><div class="scan"></div>
       <div class="frame-chip" id="fchip">${Img.isOffline() ? '' : '<span class="spinner"></span>Making your photo…'}</div></div>
     <p class="note center-note">A concept, not a final design.</p>
-    <div class="row" id="frow"><button class="gbtn green big" id="all" type="button">SEE ALL MY SPACES</button></div></div></section>`);
-  $('#all').onclick = results;
+    <div class="row" id="frow"><button class="gbtn blue" id="explore" type="button">EXPLORE IN 3D</button><button class="gbtn green big" id="all" type="button">SEE ALL MY SPACES</button></div></div></section>`);
+  $('#all').onclick = results; $('#explore').onclick = () => Explore.open(G.picks, {focus: s, title: `${esc(G.name)}’s floor`});
   if (Img.isOffline()) { $('#frame .scan').remove(); $('#fchip').remove(); confetti(160); return; }
   const ref = G.photo[s]?.url || Builder.snapshot(s, G.picks);
   const prompt = D.final + eyeLevel(s) + ` ${D.style.shell} ${D.style.realism} ${D.style.camera.wide} ${D.style.negative}` + (again ? ` Alternative take ${Date.now() % 997}.` : '');
@@ -333,12 +333,12 @@ function results() {
   const imgs = STOPS.map(x => ({k: x.k, n: x.n, url: G.photo[x.k]?.url || Builder.snapshot(x.k, G.picks)}));
   enter(`<section class="screen results"><div class="rinner">
     <div class="rhead"><div><div class="eyebrow light">Master of your universe</div><h1 class="dt h1">You built it, ${esc(G.name)}</h1><p class="lede">${Object.values(G.picks).flat().length} choices · ${ideas.length} new idea${ideas.length === 1 ? '' : 's'}</p></div>
-      <div class="row"><button class="gbtn blue" id="save" type="button">SAVE MY IMAGES</button><button class="gbtn green" id="again" type="button">PLAY AGAIN</button></div></div>
+      <div class="row"><button class="gbtn" id="explore" type="button">EXPLORE IN 3D</button><button class="gbtn blue" id="save" type="button">SAVE MY IMAGES</button><button class="gbtn green" id="again" type="button">PLAY AGAIN</button></div></div>
     ${G.final ? `<div class="frame"><img src="${G.final}" alt="Photo of your favourite space"></div>` : ''}
     <div class="rgrid">${imgs.map(x => `<div class="rcard"><img src="${x.url}" alt="${esc(x.n)}"><div class="rc"><h3>${esc(x.n)}${favStop() === x.k ? ' ★' : ''}</h3><div class="chips">${chips(x.k)}</div></div></div>`).join('')}</div>
     ${ideas.length ? `<div class="card-panel ideas"><h3>Your new ideas</h3><div class="chips">${ideas.map(t => `<span class="w">★ ${esc(t)}</span>`).join('')}</div></div>` : ''}
   </div></section>`);
-  $('#again').onclick = title;
+  $('#again').onclick = title; $('#explore').onclick = () => Explore.open(G.picks, {focus: favStop(), title: `${esc(G.name)}’s floor`});
   $('#save').onclick = () => { [...(G.final ? [{url: G.final, n: 'my-photo'}] : []), ...imgs.map(x => ({url: x.url, n: 'my-' + x.k}))].forEach((x, i) => setTimeout(() => { const a = document.createElement('a'); a.href = x.url; a.download = x.n + (x.url.startsWith('data:image/jpeg') ? '.jpg' : '.png'); a.click(); }, i * 300)); };
   confetti(80);
 }

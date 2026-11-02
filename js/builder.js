@@ -5,10 +5,10 @@ let BORN = {}, PICKS = {};
 const P = {oak:'#cfae84', oakD:'#a98660', white:'#ecebe6', sage:'#9cb29a', navy:'#425a7c', felt:'#aaa69e', char:'#4a4f56', steel:'#9aa1a8',
   glass:'rgba(196,222,236,0.30)', screen:'#22272e', green:'#6c9363', green2:'#86aa78', pot:'#e6e2da', gold:'#c9a24a', cork:'#b88f63',
   carpet:'#c3bcb1', red:'#b5583f', blue:'#55779f', deck:'#9b7a58', felt2:'#6f7a8a', pink:'#cfa0a8'};
-let OUT = [], TAG = 'base', FLAGS = {};
+let OUT = [], TAG = 'base', FLAGS = {}, NOSLICE = false;
 function B(x, y, z, w, d, h, c, o = {}) {
   const flat = h <= 0.05 && z <= 0.06;
-  if (!flat && !o.layer && (w > 1.2 || d > 1.2)) {           // slice long boxes so painter's sort stays right
+  if (!flat && !o.layer && !NOSLICE && (w > 1.2 || d > 1.2)) {           // slice long boxes so painter's sort stays right
     const nx = Math.ceil(w / 1), ny = Math.ceil(d / 1);
     for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++)
       OUT.push({x: x + i * w / nx, y: y + j * d / ny, z, w: w / nx, d: d / ny, h, c, tag: TAG, ...o});
@@ -21,7 +21,9 @@ function withTag(t, f) { const old = TAG; TAG = t; f(); TAG = old; }
 
 function shade(c, f) {
   if (c.startsWith('rgba')) return c;
-  const n = parseInt(c.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  let r, g, b;
+  if (c.startsWith('rgb(')) [r, g, b] = c.slice(4, -1).split(',').map(Number);
+  else { const n = parseInt(c.slice(1), 16); r = n >> 16; g = (n >> 8) & 255; b = n & 255; }
   const m = v => Math.max(0, Math.min(255, Math.round(f > 1 ? v + (255 - v) * (f - 1) : v * f)));
   return `rgb(${m(r)},${m(g)},${m(b)})`;
 }
@@ -30,27 +32,60 @@ function poly(ctx, pts, fill) { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]
 const easeBack = t => { const c = 1.7; t = Math.min(1, Math.max(0, t)); return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
 
 // ============================================================ furniture kit
-function table(x, y, w, d, top = 0.72, c = P.oak) { B(x + w / 2 - 0.06, y + d / 2 - 0.06, 0, 0.12, 0.12, top, P.char); B(x, y, top, w, d, 0.06, c); }
-function stool(x, y, h = 0.75, c = P.char) { B(x, y, 0, 0.34, 0.34, h, c); }
-function chair(x, y, back, c = P.char) {      // back: side of the backrest
-  B(x, y, 0, 0.46, 0.46, 0.44, c);
-  if (back === 'n') B(x, y, 0.44, 0.46, 0.08, 0.45, c); if (back === 's') B(x, y + 0.38, 0.44, 0.46, 0.08, 0.45, c);
-  if (back === 'w') B(x, y, 0.44, 0.08, 0.46, 0.45, c); if (back === 'e') B(x + 0.38, y, 0.44, 0.08, 0.46, 0.45, c);
+const LEG = '#30353b', TRIM = '#3a3f46';
+function table(x, y, w, d, top = 0.72, c = P.oak) {
+  if (w < 1.25 && d < 1.25) { B(x + w / 2 - 0.22, y + d / 2 - 0.22, 0, 0.44, 0.44, 0.03, LEG); B(x + w / 2 - 0.035, y + d / 2 - 0.035, 0.03, 0.07, 0.07, top - 0.03, LEG); }
+  else [[0.05, 0.05], [w - 0.1, 0.05], [0.05, d - 0.1], [w - 0.1, d - 0.1]].forEach(([a, b]) => B(x + a, y + b, 0, 0.05, 0.05, top, LEG));
+  B(x, y, top, w, d, 0.045, c); B(x + 0.03, y + 0.03, top - 0.04, w - 0.06, d - 0.06, 0.04, shade(c, 0.82));
 }
-function plant(x, y, s = 1) { B(x, y, 0, 0.42 * s, 0.42 * s, 0.4 * s, P.pot); B(x - 0.06 * s, y - 0.06 * s, 0.4 * s, 0.54 * s, 0.54 * s, 0.55 * s, P.green); B(x + 0.06 * s, y + 0.06 * s, 0.95 * s, 0.3 * s, 0.3 * s, 0.25 * s, P.green2); }
+function stool(x, y, h = 0.75, c = '#59636f') { B(x + 0.02, y + 0.02, 0, 0.32, 0.32, 0.025, LEG); B(x + 0.145, y + 0.145, 0.025, 0.05, 0.05, h - 0.08, P.steel); B(x, y, h - 0.06, 0.36, 0.36, 0.06, c); }
+// office chair: five-star base, gas lift, seat, backrest with a gap, armrests. back = side the backrest is on
+function chair(x, y, back, c = P.char) {
+  B(x + 0.03, y + 0.205, 0.015, 0.4, 0.05, 0.03, LEG); B(x + 0.205, y + 0.03, 0.015, 0.05, 0.4, 0.03, LEG);
+  B(x + 0.2, y + 0.2, 0.045, 0.06, 0.06, 0.34, P.steel);
+  B(x, y, 0.39, 0.46, 0.46, 0.07, c);
+  const ns = back === 'n' || back === 's';
+  if (ns) { B(x - 0.02, y + 0.1, 0.5, 0.04, 0.26, 0.03, LEG); B(x + 0.44, y + 0.1, 0.5, 0.04, 0.26, 0.03, LEG); B(x - 0.02, y + 0.2, 0.46, 0.04, 0.05, 0.05, LEG); B(x + 0.44, y + 0.2, 0.46, 0.04, 0.05, 0.05, LEG); }
+  else { B(x + 0.1, y - 0.02, 0.5, 0.26, 0.04, 0.03, LEG); B(x + 0.1, y + 0.44, 0.5, 0.26, 0.04, 0.03, LEG); B(x + 0.2, y - 0.02, 0.46, 0.05, 0.04, 0.05, LEG); B(x + 0.2, y + 0.44, 0.46, 0.05, 0.04, 0.05, LEG); }
+  if (back === 'n') { B(x + 0.2, y - 0.01, 0.46, 0.06, 0.05, 0.12, LEG); B(x + 0.02, y - 0.05, 0.56, 0.42, 0.06, 0.44, c); }
+  if (back === 's') { B(x + 0.2, y + 0.42, 0.46, 0.06, 0.05, 0.12, LEG); B(x + 0.02, y + 0.45, 0.56, 0.42, 0.06, 0.44, c); }
+  if (back === 'w') { B(x - 0.01, y + 0.2, 0.46, 0.05, 0.06, 0.12, LEG); B(x - 0.05, y + 0.02, 0.56, 0.06, 0.42, 0.44, c); }
+  if (back === 'e') { B(x + 0.42, y + 0.2, 0.46, 0.05, 0.06, 0.12, LEG); B(x + 0.45, y + 0.02, 0.56, 0.06, 0.42, 0.44, c); }
+}
+function plant(x, y, s = 1) {
+  B(x, y, 0, 0.42 * s, 0.42 * s, 0.34 * s, P.pot); B(x - 0.02 * s, y - 0.02 * s, 0.34 * s, 0.46 * s, 0.46 * s, 0.05 * s, '#d9d3c8'); B(x + 0.03 * s, y + 0.03 * s, 0.39 * s, 0.36 * s, 0.36 * s, 0.01, '#5a4636');
+  B(x - 0.06 * s, y + 0.02 * s, 0.38 * s, 0.32 * s, 0.32 * s, 0.34 * s, P.green); B(x + 0.16 * s, y - 0.07 * s, 0.42 * s, 0.32 * s, 0.3 * s, 0.44 * s, P.green2);
+  B(x + 0.04 * s, y + 0.16 * s, 0.6 * s, 0.3 * s, 0.28 * s, 0.4 * s, '#5f8c58'); B(x - 0.04 * s, y - 0.08 * s, 0.78 * s, 0.24 * s, 0.24 * s, 0.3 * s, '#7aa36c'); B(x + 0.1 * s, y + 0.05 * s, 0.94 * s, 0.22 * s, 0.22 * s, 0.28 * s, P.green2);
+}
+// sofa with legs, base, split seat cushions, a back and two arms. back = side of the backrest
 function sofa(x, y, w, d, back, c = P.navy) {
-  B(x, y, 0, w, d, 0.42, c);
-  const t = 0.2, hb = 0.42;
-  if (back === 'n') B(x, y, hb, w, t, 0.4, c); if (back === 's') B(x, y + d - t, hb, w, t, 0.4, c);
-  if (back === 'w') B(x, y, hb, t, d, 0.4, c); if (back === 'e') B(x + w - t, y, hb, t, d, 0.4, c);
+  const alongX = back === 'n' || back === 's', len = alongX ? w : d, dep = alongX ? d : w;
+  const R = (a, b, z, la, lb, h, col) => alongX ? B(x + a, y + b, z, la, lb, h, col) : B(x + b, y + a, z, lb, la, h, col);   // a = along the length, b = across
+  const backAt = (back === 'n' || back === 'w') ? 0 : dep - 0.18, seatFrom = (back === 'n' || back === 'w') ? 0.18 : 0;
+  [[0.06, 0.06], [len - 0.1, 0.06], [0.06, dep - 0.1], [len - 0.1, dep - 0.1]].forEach(([a, b]) => R(a, b, 0, 0.04, 0.04, 0.08, LEG));
+  R(0, 0, 0.08, len, dep, 0.18, shade(c, 0.86));
+  const n = Math.max(1, Math.round((len - 0.28) / 0.7)), cw = (len - 0.28) / n;
+  for (let i = 0; i < n; i++) R(0.14 + i * cw + 0.01, seatFrom + 0.01, 0.26, cw - 0.02, dep - 0.2, 0.13, c);
+  R(0, backAt, 0.26, len, 0.18, 0.46, shade(c, 0.94));
+  R(0, 0, 0.26, 0.14, dep, 0.3, shade(c, 0.9)); R(len - 0.14, 0, 0.26, 0.14, dep, 0.3, shade(c, 0.9));
 }
-function screenOn(x, y, z, w, d, h, glow) { B(x, y, z, w, d, h, glow ? '#3d7bd6' : P.screen, glow ? {glow: 1} : {}); }
+// a screen with a dark frame and a lit face toward the viewer
+function screenOn(x, y, z, w, d, h, glow) {
+  B(x, y, z, w, d, h, '#1d2127');
+  const face = glow ? '#4f8fe0' : '#2f4f7a', o = glow ? {glow: 1} : {};
+  if (d <= w) B(x + 0.04, y + d, z + 0.04, w - 0.08, 0.008, h - 0.08, face, o); else B(x + w, y + 0.04, z + 0.04, 0.008, d - 0.08, h - 0.08, face, o);
+}
+// a glazed room: solid back and side, glass front and side with mullions and a top rail
 function room(x0, y0, x1, y1, h = 2.5, o = {}) {
   flat(x0, y0, x1 - x0, y1 - y0, o.floor || P.carpet, 0.02);
   B(x0, y0, 0, x1 - x0, 0.08, h, o.back || P.white);
   B(x0, y0, 0, 0.08, y1 - y0, h, o.side || P.white);
   B(x0, y1 - 0.06, 0, x1 - x0, 0.06, h, P.glass);
   B(x1 - 0.06, y0, 0, 0.06, y1 - y0, h, P.glass);
+  for (let x = x0 + 1.1; x < x1 - 0.3; x += 1.1) B(x, y1 - 0.07, 0, 0.04, 0.08, h, TRIM);
+  for (let y = y0 + 1.1; y < y1 - 0.3; y += 1.1) B(x1 - 0.07, y, 0, 0.08, 0.04, h, TRIM);
+  B(x1 - 0.08, y1 - 0.08, 0, 0.08, 0.08, h, TRIM);
+  B(x0, y1 - 0.08, h - 0.05, x1 - x0, 0.1, 0.05, TRIM); B(x1 - 0.08, y0, h - 0.05, 0.1, y1 - y0, 0.05, TRIM);
 }
 // desk in local coords: u along the desk, v from desk back toward the chair; dir = way the person faces
 function desk(ox, oy, dir, i = 0, extra = {}) {
@@ -65,18 +100,28 @@ function desk(ox, oy, dir, i = 0, extra = {}) {
   const F = FLAGS, raised = (F.heightadj && i % 2) || (F.smartdesk && i % 3 === 0) || extra.raised;
   const top = raised ? 1.02 : 0.72;
   if (extra.castors) [[0.05, 0.05], [1.25, 0.05], [0.05, 0.55], [1.25, 0.55]].forEach(([u, v]) => L(u, v, 0, 0.1, 0.1, 0.08, '#151515'));
-  L(0.06, 0.06, 0, 0.07, 0.58, top, P.white); L(1.27, 0.06, 0, 0.07, 0.58, top, P.white);
-  L(0, 0, top, 1.4, 0.7, 0.05, P.oak);
-  withTag('s1.desk.monitor', () => F.monitor ? (L(0.22, 0.08, top + 0.05, 0.44, 0.05, 0.32, P.screen), L(0.74, 0.08, top + 0.05, 0.44, 0.05, 0.32, P.screen)) : 0);
-  if (!F.monitor) L(0.45, 0.08, top + 0.05, 0.5, 0.05, 0.32, P.screen);
-  withTag('s1.desk.accshelf', () => F.accshelf && (L(0.04, 0.0, top + 0.37, 1.32, 0.12, 0.03, P.oakD), L(1.12, 0.0, top + 0.4, 0.12, 0.1, 0.16, P.green)));
-  withTag('s1.desk.shelving', () => F.shelving && i % 2 === 0 && L(1.42, 0.08, 0, 0.32, 0.5, 1.1, P.oakD));
-  withTag('s1.desk.whiteboard', () => F.whiteboard && L(0.02, 0.1, top + 0.05, 0.04, 0.45, 0.42, '#ffffff'));
-  withTag('s1.desk.baghook', () => F.baghook && L(0.25, 0.64, top - 0.42, 0.3, 0.12, 0.36, P.red));
-  withTag('s1.desk.nameplate', () => F.nameplate && L(0.55, 0.6, top + 0.05, 0.3, 0.05, 0.07, '#ffffff'));
-  withTag('s1.desk.smartdesk', () => F.smartdesk && L(0.1, 0.66, top + 0.02, 1.2, 0.03, 0.03, '#7fe9ff', {glow: 1}));
+  const z0 = extra.castors ? 0.08 : 0;
+  // T-legs, crossbar and modesty panel
+  for (const u of [0.07, 1.27]) { L(u, 0.04, z0, 0.06, 0.62, 0.03, LEG); L(u, 0.3, z0 + 0.03, 0.06, 0.06, top - z0 - 0.03, F.heightadj ? P.steel : P.white); }
+  L(0.13, 0.3, top - 0.09, 1.14, 0.04, 0.04, LEG); L(0.13, 0.03, 0.32, 1.14, 0.025, top - 0.36, '#cdd2d6');
+  L(0, 0, top, 1.4, 0.7, 0.045, P.oak);
+  // monitor(s) on stands, keyboard, mouse, mug
+  const mon = u => { L(u + 0.17, 0.1, top + 0.045, 0.2, 0.12, 0.015, LEG); L(u + 0.25, 0.13, top + 0.06, 0.04, 0.04, 0.12, LEG); L(u, 0.12, top + 0.16, 0.54, 0.03, 0.34, '#1d2127'); L(u + 0.03, 0.15, top + 0.19, 0.48, 0.006, 0.28, '#35598a'); };
+  withTag('s1.desk.monitor', () => { if (F.monitor) { mon(0.14); mon(0.72); } });
+  if (!F.monitor) mon(0.43);
+  L(0.48, 0.42, top + 0.045, 0.42, 0.14, 0.015, '#d9dde2'); L(0.98, 0.45, top + 0.045, 0.06, 0.09, 0.02, '#d9dde2');
+  if (i % 3 === 1) L(0.2, 0.36, top + 0.045, 0.08, 0.08, 0.1, '#e9e2d6');
+  withTag('s1.desk.accshelf', () => F.accshelf && (L(0.04, 0.0, top + 0.4, 1.32, 0.12, 0.03, P.oakD), L(0.06, 0.0, top + 0.045, 0.03, 0.1, 0.38, LEG), L(1.31, 0.0, top + 0.045, 0.03, 0.1, 0.38, LEG), L(1.1, 0.0, top + 0.43, 0.12, 0.1, 0.16, P.green), L(0.3, 0.01, top + 0.43, 0.16, 0.08, 0.06, '#2b2f35')));
+  withTag('s1.desk.shelving', () => F.shelving && i % 2 === 0 && (L(1.42, 0.08, 0, 0.34, 0.5, 1.1, P.oakD), [0.35, 0.7].forEach(z => L(1.44, 0.58, z, 0.3, 0.01, 0.02, P.oak)), L(1.46, 0.12, 0.75, 0.08, 0.3, 0.28, P.blue), L(1.56, 0.12, 0.75, 0.08, 0.3, 0.24, P.red)));
+  withTag('s1.desk.whiteboard', () => F.whiteboard && (L(0.02, 0.1, top + 0.05, 0.04, 0.45, 0.42, '#ffffff'), L(0.025, 0.15, top + 0.3, 0.03, 0.2, 0.01, P.blue)));
+  withTag('s1.desk.baghook', () => F.baghook && (L(0.3, 0.66, top - 0.05, 0.03, 0.06, 0.05, LEG), L(0.22, 0.68, top - 0.45, 0.22, 0.12, 0.36, P.red)));
+  withTag('s1.desk.nameplate', () => F.nameplate && L(0.6, 0.62, top + 0.045, 0.24, 0.05, 0.07, '#ffffff'));
+  withTag('s1.desk.smartdesk', () => F.smartdesk && (L(0.1, 0.66, top + 0.02, 1.2, 0.03, 0.03, '#7fe9ff', {glow: 1}), L(1.18, 0.12, top + 0.045, 0.06, 0.06, 0.36, LEG), L(1.06, 0.12, top + 0.4, 0.2, 0.12, 0.04, '#ffe7a8', {glow: 1})));
   if (extra.screen) extra.screen(L, top);
-  L(0.47, 0.92, 0, 0.46, 0.46, 0.44, P.char); L(0.47, 1.34, 0.44, 0.46, 0.08, 0.46, P.char);
+  // chair, turned to face the desk
+  const back = {n: 's', s: 'n', w: 'e', e: 'w'}[dir];
+  let cx, cy; ({n: () => { cx = ox + 0.47; cy = oy + 0.9; }, s: () => { cx = ox + 0.47; cy = oy + 1.6 - 0.9 - 0.46; }, w: () => { cx = ox + 0.9; cy = oy + 0.47; }, e: () => { cx = ox + 1.6 - 0.9 - 0.46; cy = oy + 0.47; }})[dir]();
+  chair(cx, cy, back);
 }
 
 // ============================================================ zones + slots
@@ -136,7 +181,7 @@ R['s1.hood.homebase'] = () => { flat(2.4, 3.3, 9.4, 7.0, '#d9a774', 0.016);
   for (let i = 0; i < 6; i++) B(1.0 + i * 0.55, 0.5, 0, 0.5, 0.55, 1.9, i % 2 ? P.oak : P.oakD);
   screenOn(5.0, 0.5, 0.9, 2.2, 0.08, 1.2, true); B(7.8, 0.5, 0, 4.4, 0.08, 2.2, '#ffffff'); };
 // ---- close to the team (slot items)
-R['s1.near.lockers'] = r => { for (let i = 0; i < 6; i++) seg(r, i / 6 + 0.004, (i + 1) / 6 - 0.004, 0.6, 0, 1.9, i % 2 ? P.oak : P.oakD); };
+R['s1.near.lockers'] = r => { for (let i = 0; i < 6; i++) { seg(r, i / 6 + 0.004, (i + 1) / 6 - 0.004, 0.6, 0, 1.9, i % 2 ? P.oak : P.oakD); seg(r, i / 6 + 0.12, i / 6 + 0.135, 0.02, 1.0, 0.16, LEG, 0.6); seg(r, i / 6 + 0.02, (i + 1) / 6 - 0.02, 0.01, 0.95, 0.008, shade(P.oakD, 0.8), 0.6); } };
 R['s1.near.writingwall'] = r => { seg(r, 0.02, 0.98, 0.08, 0, 2.2, '#ffffff'); seg(r, 0.2, 0.5, 0.02, 1.3, 0.03, P.blue, 0.08); seg(r, 0.3, 0.7, 0.02, 1.6, 0.03, P.red, 0.08); };
 R['s1.near.mobilewb'] = r => { [[0.08, 0.45], [0.55, 0.92]].forEach(([a, b]) => { seg(r, a, b, 0.06, 0.5, 1.1, '#ffffff', 0.3); seg(r, a, a + 0.03, 0.08, 0, 0.5, P.steel, 0.3); seg(r, b - 0.03, b, 0.08, 0, 0.5, P.steel, 0.3); }); };
 R['s1.near.awards'] = r => { seg(r, 0.1, 0.9, 0.35, 0, 0.95, P.oak); [0.18, 0.38, 0.58, 0.76].forEach(t => seg(r, t, t + 0.05, 0.15, 0.95, 0.28, P.gold, 0.1, {glow: 1})); };
@@ -177,7 +222,7 @@ R['s2.seat.terrace'] = r => { flat(r.x + 0.1, r.y + 0.1, r.w - 0.2, r.d - 0.2, P
 R['s2.seat.stepped'] = r => { [[0.3, 1.2], [0.95, 0.8], [1.6, 0.4]].forEach(([dy, h], i) => { B(r.x + 0.2, r.y + dy, 0, r.w - 0.4, 0.65, h, P.oak); [0.3, 1.2, 2.0].forEach((dx, j) => B(r.x + dx, r.y + dy + 0.15, h, 0.45, 0.4, 0.1, [P.sage, P.navy, P.gold][(i + j) % 3])); }); };
 // ---- add the fun (fun slots)
 const mid = r => [r.x + r.w / 2, r.y + r.d / 2];
-R['s2.fun.pool'] = r => { const [cx, cy] = mid(r); B(cx - 1.2, cy - 0.65, 0, 2.4, 1.3, 0.78, '#6a4a33'); B(cx - 1.1, cy - 0.55, 0.78, 2.2, 1.1, 0.03, '#2f7d4f'); B(cx - 0.3, cy - 0.1, 0.81, 0.08, 0.08, 0.06, '#ffffff'); B(cx + 0.3, cy, 0.81, 0.08, 0.08, 0.06, P.red); };
+R['s2.fun.pool'] = r => { const [cx, cy] = mid(r); [[-1.1, -0.55], [1.0, -0.55], [-1.1, 0.45], [1.0, 0.45]].forEach(([a, b]) => B(cx + a, cy + b, 0, 0.1, 0.1, 0.5, '#4a3324')); B(cx - 1.2, cy - 0.65, 0.5, 2.4, 1.3, 0.28, '#6a4a33'); B(cx - 1.4, cy + 0.75, 0.82, 1.6, 0.04, 0.03, '#c8a46e'); B(cx - 1.1, cy - 0.55, 0.78, 2.2, 1.1, 0.03, '#2f7d4f'); B(cx - 0.3, cy - 0.1, 0.81, 0.08, 0.08, 0.06, '#ffffff'); B(cx + 0.3, cy, 0.81, 0.08, 0.08, 0.06, P.red); };
 R['s2.fun.foosball'] = r => { const [cx, cy] = mid(r); B(cx - 0.65, cy - 0.4, 0, 1.3, 0.8, 0.9, '#7a5236'); B(cx - 0.6, cy - 0.35, 0.9, 1.2, 0.7, 0.02, '#3f8f4f'); [-0.4, -0.1, 0.2, 0.5].forEach(dx => B(cx + dx, cy - 0.55, 0.95, 0.04, 1.1, 0.04, P.steel)); };
 R['s2.fun.pingpong'] = r => { const [cx, cy] = mid(r); B(cx - 1.0, cy - 0.1, 0, 0.1, 0.2, 0.72, P.char); B(cx + 0.9, cy - 0.1, 0, 0.1, 0.2, 0.72, P.char); B(cx - 1.3, cy - 0.7, 0.72, 2.6, 1.4, 0.05, P.blue); B(cx - 0.02, cy - 0.7, 0.77, 0.04, 1.4, 0.14, '#ffffff'); };
 R['s2.fun.chess'] = r => { const [cx, cy] = mid(r); table(cx - 0.45, cy - 0.45, 0.9, 0.9); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) B(cx - 0.36 + i * 0.18, cy - 0.36 + j * 0.18, 0.78, 0.18, 0.18, 0.015, (i + j) % 2 ? '#2b2b2b' : '#f4efe4'); chair(cx - 1.05, cy - 0.23, 'w'); chair(cx + 0.6, cy - 0.23, 'e'); };
@@ -190,7 +235,7 @@ R['s2.work.mobileboards'] = r => R['s1.near.mobilewb']({...r, d: 0.5});
 R['s2.work.sharescreen'] = r => { const [x, y] = at(r, 0.3); screenOn(x, y, 0.8, 1.0, 0.08, 0.6, true); B(x + 0.45, y, 0, 0.08, 0.08, 0.8, P.steel); };
 R['s2.work.coffeebar'] = r => { seg(r, 0.04, 0.75, 0.6, 0, 1.0, P.white); seg(r, 0.04, 0.75, 0.6, 1.0, 0.05, P.oak); seg(r, 0.1, 0.28, 0.45, 1.05, 0.45, P.char); [0.4, 0.48, 0.56].forEach(t => seg(r, t, t + 0.03, 0.1, 1.05, 0.1, '#ffffff', 0.2)); };
 R['s2.work.pantry'] = r => { seg(r, 0.04, 0.5, 0.5, 0, 1.8, P.oak); [P.red, P.gold, P.green2, P.blue].forEach((c, i) => seg(r, 0.06 + i * 0.1, 0.13 + i * 0.1, 0.3, 0.6 + (i % 2) * 0.5, 0.25, c, 0.05)); seg(r, 0.55, 0.8, 0.6, 0, 1.9, '#e9eef2'); };
-R['s2.work.lockers'] = r => { for (let i = 0; i < 6; i++) seg(r, i / 6 + 0.004, (i + 1) / 6 - 0.004, 0.6, 0, 1.8, i % 2 ? P.navy : '#2b4670'); };
+R['s2.work.lockers'] = r => { for (let i = 0; i < 6; i++) { seg(r, i / 6 + 0.004, (i + 1) / 6 - 0.004, 0.6, 0, 1.8, i % 2 ? P.navy : '#2b4670'); seg(r, i / 6 + 0.12, i / 6 + 0.135, 0.02, 0.95, 0.16, '#d0d4d8', 0.6); } };
 R['s2.work.purifier'] = r => { [0.2, 0.7].forEach(t => { seg(r, t, t + 0.12, 0.38, 0, 1.1, '#ffffff', 0.1); seg(r, t, t + 0.12, 0.38, 1.1, 0.04, P.steel, 0.1); }); };
 // ---- meeting rooms
 R['s3.room.booth'] = () => { const [x0, y0] = ROOMS['s3.room.booth']; B(x0, y0, 0, 1.3, 1.3, 2.3, P.navy); B(x0, y0 + 1.28, 0.1, 1.3, 0.04, 2.0, P.glass); stool(x0 + 1.5, y0 + 0.5); };
@@ -345,6 +390,8 @@ const Builder = {
   },
   snapshot(stop, picks, w = 1280, h = 720) { const key = stop + JSON.stringify(Object.entries(picks).filter(([k]) => stop === 'all' || k.startsWith(stop + '.'))); if (SNAP.has(key)) return SNAP.get(key);
     const c = document.createElement('canvas'); c.width = w; c.height = h; BORN = {}; paint(c.getContext('2d'), w, h, stop, picks, null); const u = c.toDataURL('image/jpeg', 0.9); SNAP.set(key, u); return u; },
+  // raw boxes (unsliced) for the real-3D explore view
+  boxes(stop, picks) { NOSLICE = true; const out = scene(stop, picks).slice(); NOSLICE = false; return out; },
   // a unique 3D thumbnail for one catalog option
   icon(id) {
     if (ICONS.has(id)) return ICONS.get(id); if (!R[id]) return null;
