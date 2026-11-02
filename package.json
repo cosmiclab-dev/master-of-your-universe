@@ -1,0 +1,1 @@
+{ "name": "master-of-your-universe", "private": true, "type": "module", "engines": { "node": ">=20" } }
