@@ -5,7 +5,7 @@
   const DEFAULTS = {
     provider: 'offline', route: 'auto', quality: 'high', coins: false, kiosk: false,
     keys: {gemini: '', openai: '', fal: '', unsloth: '', custom: '', cloudflare: '', pollinations: ''},
-    models: {gemini: 'gemini-3.1-flash-image', openai: 'gpt-image-1', falGen: 'fal-ai/qwen-image', falEdit: 'fal-ai/qwen-image-edit', unsloth: '', custom: '', cloudflare: '@cf/black-forest-labs/flux-1-schnell', pollinations: 'flux'},
+    models: {gemini: 'gemini-3.1-flash-image', openai: 'gpt-image-1', falGen: 'fal-ai/qwen-image', falEdit: 'fal-ai/qwen-image-edit', unsloth: '', custom: '', cloudflare: '@cf/black-forest-labs/flux-2-klein-9b', cloudflareFinal: '@cf/black-forest-labs/flux-2-dev', pollinations: 'flux'},
     base: {gemini: 'https://generativelanguage.googleapis.com/v1beta', openai: 'https://api.openai.com/v1', fal: 'https://fal.run', unsloth: 'http://127.0.0.1:8888/v1', custom: '', cloudflare: 'https://api.cloudflare.com/client/v4', pollinations: 'https://image.pollinations.ai'},
     account: {cloudflare: ''},
     caps: {},
@@ -15,6 +15,7 @@
   function merge(a, b) { for (const k in b) { if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k])) a[k] = merge(a[k] || {}, b[k]); else a[k] = b[k]; } return a; }
   const load = () => { try { return merge(structuredClone(DEFAULTS), JSON.parse(localStorage.getItem('moyu-settings') || '{}')); } catch (e) { return structuredClone(DEFAULTS); } };
   let S = load();
+  if (/flux-1-schnell/.test(S.models.cloudflare || '')) S.models.cloudflare = DEFAULTS.models.cloudflare;   // move older saved settings to FLUX.2
   const save = s => { S = s; try { localStorage.setItem('moyu-settings', JSON.stringify(s)); } catch (e) {} };
 
   // ---------------------------------------------------------- transport
@@ -163,10 +164,15 @@
     edits: false,
     url(path) { return `${S.base.cloudflare}/accounts/${S.account.cloudflare || '{account}'}${path}`; },
     auth() { return S.keys.cloudflare ? {Authorization: 'Bearer ' + S.keys.cloudflare} : {}; },
-    async run({prompt}) {
+    async run({prompt, final}) {
       if (!S.keys.cloudflare && !(await useProxy())) throw new Error('Add a Cloudflare API token in Settings, or put it in keys.env.');
       if (!S.account.cloudflare && !serverKeys.cloudflareAccount) throw new Error('Add your Cloudflare account ID in Settings, or put it in keys.env.');
-      const r = await xfetch(this.url(`/ai/run/${S.models.cloudflare}`), {method: 'POST', headers: {'Content-Type': 'application/json', ...this.auth()}, body: JSON.stringify({prompt: prompt.slice(0, 2000), steps: 8})});
+      // stop photos: FLUX.2 klein (about 3 s). Final photo: FLUX.2 dev (about 15 s, best detail). FLUX.2 takes a multipart form.
+      const model = (final && S.models.cloudflareFinal) || S.models.cloudflare;
+      let opts;
+      if (/flux-2/.test(model)) { const fd = new FormData(); fd.append('prompt', prompt.slice(0, 2800)); fd.append('width', '1344'); fd.append('height', '768'); opts = {method: 'POST', headers: this.auth(), body: fd}; }
+      else opts = {method: 'POST', headers: {'Content-Type': 'application/json', ...this.auth()}, body: JSON.stringify({prompt: prompt.slice(0, 2000), steps: 8})};
+      const r = await xfetch(this.url(`/ai/run/${model}`), opts);
       const j = await readJson(r); if (!r.ok || j.success === false) throw new Error(j.errors?.[0]?.message ? `Cloudflare: ${j.errors[0].message}` : errMsg(j, r));
       const b64 = j.result?.image; if (!b64) throw new Error('Cloudflare answered but sent no image.');
       return `data:image/jpeg;base64,${b64}`;

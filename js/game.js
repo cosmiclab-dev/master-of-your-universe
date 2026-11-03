@@ -282,7 +282,7 @@ async function photo(s, show) {
   G.photoBusy[s] = true; G.photoErr[s] = null; if (onStop(s)) photoUI(s);
   const snap = Builder.snapshot(s, G.picks);
   const prompt = `${D.diorama.look} Use the attached 3D model as the exact layout: keep every piece of furniture in the same place, size and colour, and keep the same camera angle and platform. Replace the simple blocks with real, detailed furniture and materials. The space: ${sceneText(s)}`;
-  const textPrompt = photoText(s);
+  const textPrompt = isoText(s);
   try { const r = await Img.run({prompt, textPrompt, refs: [snap]}); G.photo[s] = {url: r.url, key}; if (show || onStop(s)) G.view[s] = 'photo'; }
   catch (e) { G.photoErr[s] = e.message; console.warn('photo', e.message); }
   G.photoBusy[s] = false;
@@ -303,11 +303,14 @@ function change() {
   $('#skip').onclick = () => { G.change = ''; reveal(); }; $('#go').onclick = () => { G.change = clean($('#chg').value); reveal(); };
 }
 const CAP = {'s1.desk': 2, 's1.near': 3, 's2.seat': 2, 's2.fun': 2, 's2.work': 2, 's3.kit': 3};
-// short, scene-first prompt for text-to-image models (Cloudflare, Pollinations): they read the start of a prompt most closely
-function photoText(s, again) {
-  return `Photorealistic professional architectural interior photograph, eye level, 24mm lens, two-point perspective. ${eyeLevel(s)} `
-    + `Newly completed engineering office in South Korea: white exposed concrete ceiling with linear LED lights and acoustic baffles, polished concrete floor with grey carpet tiles, floor-to-ceiling windows with green hills outside. `
-    + `Materials: pale white oak, matte white, sage-green and warm-grey felt, black steel. Real contract office furniture, correct proportions, soft natural daylight, true-to-life colour, crisp detail, magazine quality. No people, no text, no watermark.`
+// The photo prompt is written from the player's exact choices and matches the 3D builder's view: same isometric platform, same layout.
+function isoText(s, again) {
+  const scene = sceneText(s) + (G.change ? ` Also: ${G.change}.` : '');
+  return `Photorealistic isometric architectural cutaway render of one square section of a modern engineering office in South Korea, standing on a thin light-grey concrete plinth with a fine cyan edge line, on a seamless soft white studio background. `
+    + `Three-quarter isometric view from the front-left at about 35 degrees elevation, the whole platform in frame and centred with margin, nothing cropped. No ceiling; low partial walls only on the back-left and back-right edges, with floor-to-ceiling windows and slim black mullions. `
+    + `On the platform, exactly this: ${scene} `
+    + `Materials: pale white oak, matte white laminate, sage-green and warm-grey felt, black powder-coated steel, light-grey polished concrete floor with warm-grey carpet tiles in work areas. `
+    + `Real, manufacturable contract office furniture with correct proportions and neat cable management. Soft natural daylight from the windows, gentle realistic contact shadows, true-to-life colour, crisp fine detail, magazine-quality architectural visualisation. No people, no text, no labels, no watermark.`
     + (again ? ` Variation ${Date.now() % 997}.` : '');
 }
 function eyeLevel(s) {
@@ -327,12 +330,12 @@ async function reveal(again) {
     <div class="frame" id="frame"><img id="fimg" src="${G.photo[s]?.url || Builder.snapshot(s, G.picks)}" alt=""><div class="scan"></div>
       <div class="frame-chip" id="fchip">${Img.isOffline() ? '' : '<span class="spinner"></span>Making your photo…'}</div></div>
     <p class="note center-note">A concept, not a final design.</p>
-    <div class="row" id="frow"><button class="gbtn blue" id="explore" type="button">EXPLORE IN 3D</button><button class="gbtn green big" id="all" type="button">SEE ALL MY SPACES</button></div></div></section>`);
-  $('#all').onclick = results; $('#explore').onclick = () => Explore.open(G.picks, {focus: s, title: `${esc(G.name)}’s floor`});
+    <div class="row" id="frow"><button class="gbtn navy" id="restart" type="button">START OVER</button><button class="gbtn blue" id="explore" type="button">EXPLORE IN 3D</button><button class="gbtn green big" id="all" type="button">SEE ALL MY SPACES</button></div></div></section>`);
+  $('#all').onclick = results; $('#restart').onclick = title; $('#explore').onclick = () => Explore.open(G.picks, {focus: s, title: `${esc(G.name)}’s floor`});
   if (Img.isOffline()) { $('#frame .scan').remove(); $('#fchip').remove(); confetti(160); return; }
   const ref = G.photo[s]?.url || Builder.snapshot(s, G.picks);
   const prompt = D.final + eyeLevel(s) + ` ${D.style.shell} ${D.style.realism} ${D.style.camera.wide} ${D.style.negative}` + (again ? ` Alternative take ${Date.now() % 997}.` : '');
-  const textPrompt = photoText(s, again);
+  const textPrompt = isoText(s, again);
   try {
     const r = await Img.run({prompt, textPrompt, refs: [ref], final: true}); G.final = r.url;
     if (!$('#fimg')) return;
