@@ -12,6 +12,13 @@ stop, can change one thing, and gets a photoreal eye-level render of it.
 - You can also double-click `index.html`. That works for Nano Banana 2, OpenAI and fal, but Unsloth and edits of saved
   images need the server.
 
+## Turn on photos with your Google AI Studio key
+1. Double-click `Start Game.command` once. It creates `keys.env` in this folder and opens it.
+2. Paste your key after `GEMINI_API_KEY=`, save, close the game window, and run Start Game again.
+3. The game switches photos on by itself. The key stays in `keys.env` on this computer (locked to your user account) and is added by the local server, so it never reaches the browser, the zip or GitHub.
+
+Billing: a Google AI Pro subscription does not cover the API. In Google AI Studio, enable billing on the key's project. Nano Banana 2 costs about $0.07 per 1K image and $0.10 per 2K image. The game makes the three space photos at 1K and the final photo at 2K, so about $0.30 to $0.40 per player.
+
 ## Image models (Settings, the gear button)
 | Choice | What to enter |
 | --- | --- |

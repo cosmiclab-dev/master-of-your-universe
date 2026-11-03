@@ -3,3 +3,5 @@ sessions/
 tools/
 *.command
 *.bat
+keys.env
+keys.example.env

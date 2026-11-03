@@ -319,7 +319,7 @@ async function reveal(again) {
   const prompt = D.final + eyeLevel(s) + ` ${D.style.shell} ${D.style.realism} ${D.style.camera.wide} ${D.style.negative}` + (again ? ` Alternative take ${Date.now() % 997}.` : '');
   const textPrompt = `Professional architectural interior photograph for a workplace design presentation, 16:9 frame. ${eyeLevel(s)} ${D.style.shell} ${D.style.realism} ${D.style.camera.wide} ${D.style.negative}` + (again ? ` Alternative take ${Date.now() % 997}.` : '');
   try {
-    const r = await Img.run({prompt, textPrompt, refs: [ref]}); G.final = r.url;
+    const r = await Img.run({prompt, textPrompt, refs: [ref], final: true}); G.final = r.url;
     if (!$('#fimg')) return;
     $('#fimg').src = r.url; $('#fimg').classList.add('wipe'); $('#frame .scan')?.remove(); $('#fchip').remove(); confetti(180);
     $('#frow').insertAdjacentHTML('afterbegin', '<button class="gbtn navy" id="again" type="button">TRY ANOTHER LOOK</button>'); $('#again').onclick = () => reveal(true);
@@ -359,7 +359,7 @@ function facilitator(tab = 'photos') {
   const field = (id, lab, val, type = 'text', ph = '', listId = '') => `<div class="field"><label for="${id}">${lab}</label><input class="inp" id="${id}" type="${type}" value="${esc(val)}" placeholder="${esc(ph)}" autocomplete="off" ${listId ? `list="${listId}"` : ''}></div>`;
   function provFields() {
     const p = S.provider, adv = k => `<details class="adv"><summary>Advanced</summary>${field('b', 'Endpoint', S.base[k], 'text')}</details>`;
-    if (p === 'gemini') return `<div class="grid2">${field('k', 'Gemini API key', S.keys.gemini, 'password', 'From Google AI Studio')}${field('m', 'Model', S.models.gemini, 'text', 'gemini-3.1-flash-image')}</div>${adv('gemini')}<p class="note">Best for the client demo: it turns the 3D build into a photo and keeps the layout.</p>`;
+    if (p === 'gemini') return `<div class="grid2">${field('k', 'Gemini API key', S.keys.gemini, 'password', Img.serverKeys().gemini ? 'Using the key in keys.env' : 'From Google AI Studio')}${field('m', 'Model', S.models.gemini, 'text', 'gemini-3.1-flash-image')}</div>${adv('gemini')}<p class="note">Best for the client demo: it turns the 3D build into a photo and keeps the layout.</p>`;
     if (p === 'openai') return `<div class="grid2">${field('k', 'OpenAI API key', S.keys.openai, 'password', 'sk-…')}${field('m', 'Model', S.models.openai, 'text', 'gpt-image-1')}</div>${adv('openai')}`;
     if (p === 'fal') return `<div class="grid2">${field('k', 'fal.ai key', S.keys.fal, 'password')}${field('m', 'Model for new images', S.models.falGen, 'text', 'fal-ai/qwen-image')}${field('m2', 'Model for edits', S.models.falEdit, 'text', 'fal-ai/qwen-image-edit')}</div>${adv('fal')}`;
     if (p === 'unsloth' || p === 'custom') return `<div class="grid2">${field('b', 'Server address', S.base[p], 'text', p === 'unsloth' ? 'http://127.0.0.1:8888/v1' : 'https://…/v1')}${field('k', 'API key', S.keys[p], 'password', p === 'unsloth' ? 'sk-unsloth-…' : '')}${field('m', 'Image model', S.models[p], 'text', 'Press Test to list models', 'mlist')}</div>
@@ -395,7 +395,7 @@ function facilitator(tab = 'photos') {
     $('#x').onclick = () => { if (tab === 'photos') { read(); Img.save(S); } m.hidden = true; m.innerHTML = ''; if (G.i >= 0 && D.steps[G.i]) step(); };
     if (tab === 'photos') {
       $('#route').value = S.route; $('#qual').value = S.quality;
-      m.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { read(); S.provider = b.dataset.p; draw(); });
+      m.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { read(); S.provider = b.dataset.p; S.chosen = true; draw(); });
       $('#save').onclick = () => { read(); Img.save(S); say('Saved.', 'ok'); };
       $('#test').onclick = async () => { read(); Img.save(S); say('Testing…'); try { say(await Img.test(), 'ok'); const dl = $('#mlist'); if (dl) dl.innerHTML = Img.providerModels(S.provider).map(x => `<option value="${esc(x)}">`).join(''); } catch (e) { say(e.message, 'bad'); } };
       $('#tryp').onclick = async () => { read(); Img.save(S); if (Img.isOffline()) return say('Pick a photo model first.', 'bad'); say('Making a test photo… this can take up to a minute.');
@@ -432,5 +432,5 @@ let idleT; function idle() { clearTimeout(idleT); if (Img.settings.kiosk && G.i 
 ['pointerdown', 'keydown'].forEach(ev => addEventListener(ev, idle));
 addEventListener('resize', () => { const st = D.steps[G.i]; if (st && $('#bc')) paint(stopOf(st.step) === 'close' ? 'close' : stopOf(st.step)); });
 addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) { $('#modal').hidden = true; $('#modal').innerHTML = ''; } });
-title();
+Img.ready.finally(title);
 })();

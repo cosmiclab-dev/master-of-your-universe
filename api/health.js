@@ -1,1 +1,1 @@
-export default function handler(req, res) { res.status(200).json({ ok: true, server: 'vercel' }); }
+export default function handler(req, res) { res.status(200).json({ ok: true, server: 'vercel', keys: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY, fal: !!process.env.FAL_KEY } }); }

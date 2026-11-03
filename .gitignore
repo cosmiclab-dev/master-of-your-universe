@@ -3,3 +3,5 @@ sessions/
 .DS_Store
 .env
 .vercel
+keys.env
+.env.local

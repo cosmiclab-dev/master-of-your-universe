@@ -18,10 +18,10 @@
 
   // ---------------------------------------------------------- transport
   const isHttp = () => location.protocol.startsWith('http');
-  let serverOK = null;
+  let serverOK = null, serverKeys = {};
   async function hasServer() {
     if (!isHttp()) return false; if (serverOK !== null) return serverOK;
-    try { const r = await fetch('api/health', {cache: 'no-store'}); serverOK = r.ok && (await r.json()).ok === true; } catch (e) { serverOK = false; }
+    try { const r = await fetch('api/health', {cache: 'no-store'}); const j = r.ok ? await r.json() : {}; serverOK = j.ok === true; serverKeys = j.keys || {}; } catch (e) { serverOK = false; }
     return serverOK;
   }
   async function useProxy() { return S.route === 'proxy' || (S.route === 'auto' && await hasServer()); }
@@ -45,6 +45,7 @@
     const m = j?.error?.message || (typeof j?.error === 'string' && j.error) || j?.detail?.[0]?.msg || (typeof j?.detail === 'string' && j.detail) || j?.message || j?.raw || '';
     if (r.status === 401 || r.status === 403) return 'The API key was refused. Check it in Settings.' + (m ? ` (${m.slice(0, 120)})` : '');
     if (r.status === 429) return 'Too many requests or no credit left on this key.';
+    if (/billing|FAILED_PRECONDITION|free tier/i.test(m)) return 'Billing is not switched on for this key. In Google AI Studio, open the key’s project and enable billing, then try again.';
     return m ? m.slice(0, 220) : `The service answered with error ${r.status}.`;
   }
   const blobToDataUrl = b => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); });
@@ -69,9 +70,9 @@
   const P = {};
   P.gemini = {
     edits: true,
-    async run({prompt, refs}) {
+    async run({prompt, refs, final}) {
       if (!S.keys.gemini && !(await useProxy())) throw new Error('Add a Gemini API key in Settings.');
-      const size = S.quality === 'fast' ? '1K' : (await useProxy()) && !/^(localhost|127\.)/.test(location.hostname) ? '1K' : '2K';
+      const size = S.quality === 'fast' || !final ? '1K' : (await useProxy()) && !/^(localhost|127\.)/.test(location.hostname) ? '1K' : '2K';
       const body = JSON.stringify({contents: [{role: 'user', parts: [{text: prompt}, ...refs.map(u => { const d = split(u); return {inlineData: {mimeType: d.mime, data: d.b64}}; })]}],
         generationConfig: {responseModalities: ['IMAGE'], imageConfig: {aspectRatio: '16:9', imageSize: size}}});
       let last = '';
@@ -169,10 +170,13 @@
     const p = P[S.provider] || P.offline, refs = p.edits ? (job.refs || []) : [];
     const key = 'r:' + S.provider + ':' + JSON.stringify(S.models) + ':' + hash(job.prompt + '|' + refs.map(r => hash(r.slice(-4000))).join(','));
     const hit = await cacheGet(key); if (hit) return {url: hit, cached: true};
-    const url = await p.run({prompt: refs.length ? job.prompt : (job.textPrompt || job.prompt), refs});
+    const url = await p.run({prompt: refs.length ? job.prompt : (job.textPrompt || job.prompt), refs, final: !!job.final});
     await cachePut(key, url); return {url, cached: false};
   }
+  // first run on the laptop: if keys.env has a Gemini key, switch photos on without any setup
+  const ready = hasServer().then(ok => { if (ok && serverKeys.gemini && S.provider === 'offline' && !S.chosen) { S.provider = 'gemini'; S.route = 'auto'; save(S); } });
   window.Img = {
+    ready, serverKeys: () => serverKeys,
     NAMES, get settings() { return S; }, save, load, run, hasServer, useProxy, cacheClear, hash,
     test: () => (P[S.provider] || P.offline).test(), providerModels: k => P[k]?.models || [],
     canEdit: () => !!(P[S.provider] || P.offline).edits, isOffline: () => S.provider === 'offline',
