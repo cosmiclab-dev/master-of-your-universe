@@ -14,19 +14,19 @@ IMAGES = ROOT / "images"; IMAGES.mkdir(exist_ok=True)
 SESSIONS = ROOT / "sessions"; SESSIONS.mkdir(exist_ok=True)
 PORT = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else int(os.environ.get("PORT", "8777"))
 def load_keys():
-    """Read keys.env (KEY=value lines) so keys stay on this laptop and never reach the browser."""
-    f = ROOT / "keys.env"
-    if not f.exists():
-        ex = ROOT / "keys.example.env"
-        if ex.exists(): f.write_text(ex.read_text())
-    try: os.chmod(f, 0o600)
-    except Exception: pass
-    if f.exists():
+    """Read KEY=value lines from master-of-your-universe.env on the Desktop (or keys.env in this folder).
+    Keys stay on this computer and are added here, so they never reach the browser."""
+    files = [Path.home() / "Desktop" / "master-of-your-universe.env", ROOT / "keys.env"]
+    for f in files:
+        if not f.exists(): continue
+        try: os.chmod(f, 0o600)
+        except Exception: pass
         for line in f.read_text().splitlines():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1); v = v.strip().strip('"').strip("'")
                 if v and not v.startswith("paste-"): os.environ.setdefault(k.strip(), v)
+        print(f"  Reading keys from {f}")
 load_keys()
 ENV_KEYS = {"generativelanguage.googleapis.com": ("x-goog-api-key", os.environ.get("GEMINI_API_KEY", "")),
             "api.openai.com": ("Authorization", "Bearer " + os.environ["OPENAI_API_KEY"] if os.environ.get("OPENAI_API_KEY") else ""),
