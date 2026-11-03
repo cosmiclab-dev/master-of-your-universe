@@ -181,8 +181,14 @@
   // Pollinations: free, no key needed (slow: about one image every 15 seconds without a key). Text to image only.
   P.pollinations = {
     edits: false,
-    async run({prompt}) {
-      const q = new URLSearchParams({width: '1344', height: '768', seed: '42', model: S.models.pollinations || 'flux', nologo: 'true', ...(S.keys.pollinations ? {token: S.keys.pollinations} : {})});
+    // one request at a time, retried while busy, because the free service allows one image at a time
+    run(job) { const go = () => this.once(job); const p = (this.q || Promise.resolve()).then(go, go); this.q = p.catch(() => {}); return p; },
+    async once(job) {
+      let last; for (let i = 0; i < 4; i++) { try { return await this.one(job); } catch (e) { last = e; await new Promise(r => setTimeout(r, 6000 + i * 4000)); } }
+      throw last;
+    },
+    async one({prompt}) {
+      const q = new URLSearchParams({width: '1344', height: '768', seed: String(Math.floor(Math.random() * 1e6)), model: S.models.pollinations || 'flux', nologo: 'true', ...(S.keys.pollinations ? {token: S.keys.pollinations} : {})});
       const r = await xfetch(`${S.base.pollinations}/prompt/${encodeURIComponent(prompt.slice(0, 1500))}?${q}`);
       if (!r.ok) { const j = await readJson(r); throw new Error(r.status === 429 ? 'Pollinations is busy. Wait 15 seconds and try again.' : errMsg(j, r)); }
       const blob = await r.blob(); if (!blob.type.startsWith('image')) throw new Error('Pollinations sent no image.');
@@ -200,17 +206,53 @@
   async function cacheClear() { mem.clear(); const d = await db(); if (d) try { d.transaction('img', 'readwrite').objectStore('img').clear(); } catch (e) {} }
   function hash(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
 
+  // which providers have a usable key (typed in Settings, or in the env file the local server reads)
+  const keyed = p => p === 'pollinations' ? true : p === 'cloudflare' ? !!((S.keys.cloudflare || serverKeys.cloudflare) && (S.account.cloudflare || serverKeys.cloudflareAccount))
+    : p === 'custom' ? !!S.base.custom : p === 'offline' ? false : !!(S.keys[p] || serverKeys[p]);
+  const serverChoice = () => (serverKeys.cloudflare && serverKeys.cloudflareAccount) ? 'cloudflare' : serverKeys.gemini ? 'gemini' : serverKeys.openai ? 'openai' : serverKeys.fal ? 'fal' : null;
+  // if the chosen model fails on its key or billing, try the next one that has a key
+  const backups = () => ['cloudflare', 'gemini', 'openai', 'fal', 'pollinations'].filter(p => p !== S.provider && keyed(p));
+  const keyProblem = m => /refused|billing|credit|key|token|account ID|Too many/i.test(m || '');
+
+  const dead = new Set();   // models that failed on key or billing this session are skipped next time
   async function run(job) {
-    const p = P[S.provider] || P.offline, refs = p.edits ? (job.refs || []) : [];
-    const key = 'r:' + S.provider + ':' + JSON.stringify(S.models) + ':' + hash(job.prompt + '|' + refs.map(r => hash(r.slice(-4000))).join(','));
-    const hit = await cacheGet(key); if (hit) return {url: hit, cached: true};
-    const url = await p.run({prompt: refs.length ? job.prompt : (job.textPrompt || job.prompt), refs, final: !!job.final});
-    await cachePut(key, url); return {url, cached: false};
+    const order = [S.provider, ...backups()].filter(n => !dead.has(n)); let last;
+    for (const name of order) {
+      const p = P[name] || P.offline; if (name === 'offline') break;
+      const refs = p.edits ? (job.refs || []) : [];
+      const key = 'r:' + name + ':' + JSON.stringify(S.models) + ':' + hash(job.prompt + '|' + refs.map(r => hash(r.slice(-4000))).join(','));
+      const hit = await cacheGet(key); if (hit) return {url: hit, cached: true, provider: name};
+      try { const url = await p.run({prompt: refs.length ? job.prompt : (job.textPrompt || job.prompt), refs, final: !!job.final}); await cachePut(key, url); return {url, cached: false, provider: name}; }
+      catch (e) { last = e; console.warn(name, e.message); if (name !== 'pollinations') dead.add(name); }
+    }
+    throw last || new Error('No photo model is set up.');
   }
-  // first run on the laptop: if keys.env has a Gemini key, switch photos on without any setup
-  const ready = hasServer().then(ok => { if (ok && S.provider === 'offline' && !S.chosen) { const p = serverKeys.gemini ? 'gemini' : serverKeys.cloudflare ? 'cloudflare' : null; if (p) { S.provider = p; S.route = 'auto'; save(S); } } });
+  // on the laptop: if the env file has keys and the current choice can't work, switch photos on without any setup
+  async function sync() {
+    serverOK = null; const ok = await hasServer();
+    const stuck = S.provider === 'offline' ? !S.offlineByChoice : !keyed(S.provider);
+    const auto = S.route === 'auto' || S.provider === 'offline' || S.provider === 'pollinations';
+    // keys in the env file win; with no keys anywhere, fall back to Pollinations (free, no key) so photos still work
+    const p = ok ? serverChoice() : null;
+    if (p && (stuck || (auto && S.provider !== p))) { S.provider = p; S.route = 'auto'; save(S); }
+    else if (!p && stuck) { S.provider = 'pollinations'; S.route = 'auto'; save(S); }
+  }
+  const ready = sync();
+  // plain-language status for the title screen
+  function status() {
+    if (S.provider === 'pollinations' && !isHttp()) return {on: true, why: 'Photos on · Pollinations (free). For Cloudflare, open with Start Game.'};
+    if (S.provider === 'pollinations' && serverOK === false) return {on: true, why: 'Photos on · Pollinations (free). No game server, so keys are not in use.'};
+    if (S.provider === 'pollinations' && !serverKeys.cloudflare && !serverKeys.gemini) return {on: true, why: 'Photos on · Pollinations (free). No keys found in the Desktop .env file.'};
+    if (S.provider !== 'offline' && keyed(S.provider)) return {on: true, why: 'Photos on · ' + NAMES[S.provider].replace(/ \(.*\)/, '')};
+    if (!isHttp()) return {on: false, why: 'Photos are off: the game was opened as a file. Start it with “Start Game” instead.'};
+    if (serverOK === false) return {on: false, why: 'Photos are off: no game server. Start it with “Start Game”.'};
+    if (S.provider === 'offline' && S.offlineByChoice) return {on: false, why: 'Photos are off (set in Facilitator).'};
+    if (serverKeys.cloudflare && !serverKeys.cloudflareAccount) return {on: false, why: 'Photos are off: CLOUDFLARE_ACCOUNT_ID is missing in the .env file.'};
+    if (!serverKeys.cloudflare && serverKeys.cloudflareAccount) return {on: false, why: 'Photos are off: CLOUDFLARE_API_TOKEN is missing in the .env file.'};
+    return {on: false, why: 'Photos are off: no keys found in master-of-your-universe.env on your Desktop.'};
+  }
   window.Img = {
-    ready, serverKeys: () => serverKeys,
+    ready, sync, status, keyed, serverKeys: () => serverKeys,
     NAMES, get settings() { return S; }, save, load, run, hasServer, useProxy, cacheClear, hash,
     test: () => (P[S.provider] || P.offline).test(), providerModels: k => P[k]?.models || [],
     canEdit: () => !!(P[S.provider] || P.offline).edits, isOffline: () => S.provider === 'offline',

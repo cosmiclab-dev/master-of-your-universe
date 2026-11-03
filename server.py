@@ -13,28 +13,46 @@ ROOT = Path(__file__).resolve().parent
 IMAGES = ROOT / "images"; IMAGES.mkdir(exist_ok=True)
 SESSIONS = ROOT / "sessions"; SESSIONS.mkdir(exist_ok=True)
 PORT = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else int(os.environ.get("PORT", "8777"))
-def load_keys():
-    """Read KEY=value lines from master-of-your-universe.env on the Desktop (or keys.env in this folder).
-    Keys stay on this computer and are added here, so they never reach the browser."""
-    files = [Path.home() / "Desktop" / "master-of-your-universe.env", ROOT / "keys.env"]
-    for f in files:
-        if not f.exists(): continue
+KEY_FILES = [Path.home() / "Desktop" / "master-of-your-universe.env", ROOT / "keys.env"]
+NAMES = ["GEMINI_API_KEY", "OPENAI_API_KEY", "FAL_KEY", "UNSLOTH_API_KEY", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID", "POLLINATIONS_API_KEY"]
+BASE_ENV = {k: os.environ.get(k, "") for k in NAMES}
+KEYS, KEYS_FOUND, ENV_KEYS, _stamp = {}, {}, {}, None
+
+def load_keys(verbose=False):
+    """Read KEY=value lines from master-of-your-universe.env on the Desktop (or keys.env here).
+    Re-read whenever the file changes, so saving new keys needs no restart. Keys never reach the browser."""
+    global KEYS, KEYS_FOUND, ENV_KEYS, _stamp
+    stamp = tuple((str(f), f.stat().st_mtime) for f in KEY_FILES if f.exists())
+    if stamp == _stamp: return
+    _stamp = stamp; k = dict(BASE_ENV)
+    # the most recently saved key file wins
+    for f in sorted((f for f in KEY_FILES if f.exists()), key=lambda f: f.stat().st_mtime, reverse=True):
         try: os.chmod(f, 0o600)
         except Exception: pass
-        for line in f.read_text().splitlines():
+        for line in f.read_text(errors="ignore").splitlines():
             line = line.strip()
+            if line.startswith("export "): line = line[7:].strip()
             if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1); v = v.strip().strip('"').strip("'")
-                if v and not v.startswith("paste-"): os.environ.setdefault(k.strip(), v)
-        print(f"  Reading keys from {f}")
-load_keys()
-ENV_KEYS = {"generativelanguage.googleapis.com": ("x-goog-api-key", os.environ.get("GEMINI_API_KEY", "")),
-            "api.openai.com": ("Authorization", "Bearer " + os.environ["OPENAI_API_KEY"] if os.environ.get("OPENAI_API_KEY") else ""),
-            "fal.run": ("Authorization", "Key " + os.environ["FAL_KEY"] if os.environ.get("FAL_KEY") else ""),
-            "api.cloudflare.com": ("Authorization", "Bearer " + os.environ["CLOUDFLARE_API_TOKEN"] if os.environ.get("CLOUDFLARE_API_TOKEN") else ""),
-            "127.0.0.1:8888": ("Authorization", "Bearer " + os.environ["UNSLOTH_API_KEY"] if os.environ.get("UNSLOTH_API_KEY") else "")}
-KEYS_FOUND = {"gemini": bool(os.environ.get("GEMINI_API_KEY")), "openai": bool(os.environ.get("OPENAI_API_KEY")), "fal": bool(os.environ.get("FAL_KEY")), "unsloth": bool(os.environ.get("UNSLOTH_API_KEY")),
-              "cloudflare": bool(os.environ.get("CLOUDFLARE_API_TOKEN")), "cloudflareAccount": bool(os.environ.get("CLOUDFLARE_ACCOUNT_ID"))}
+                name, v = line.split("=", 1); name = name.strip(); v = v.strip().strip('"').strip("'").strip()
+                if name in k and v and not v.startswith("paste-") and not k[name]: k[name] = v
+        if verbose: print(f"  Reading keys from {f}")
+    # a Google AI Studio key (AIza... or AQ....) pasted on the wrong line is used as the Gemini key
+    for n in ("OPENAI_API_KEY", "FAL_KEY", "UNSLOTH_API_KEY", "CLOUDFLARE_API_TOKEN"):
+        if k[n].startswith(("AIza", "AQ.")):
+            if not k["GEMINI_API_KEY"]: k["GEMINI_API_KEY"] = k[n]
+            k[n] = ""
+            if verbose: print(f"  Note: {n} holds a Google AI Studio key, so it is used as GEMINI_API_KEY.")
+    KEYS = k
+    bearer = lambda n: "Bearer " + k[n] if k[n] else ""
+    ENV_KEYS = {"generativelanguage.googleapis.com": ("x-goog-api-key", k["GEMINI_API_KEY"]),
+                "api.openai.com": ("Authorization", bearer("OPENAI_API_KEY")),
+                "fal.run": ("Authorization", "Key " + k["FAL_KEY"] if k["FAL_KEY"] else ""),
+                "api.cloudflare.com": ("Authorization", bearer("CLOUDFLARE_API_TOKEN")),
+                "127.0.0.1:8888": ("Authorization", bearer("UNSLOTH_API_KEY")),
+                "image.pollinations.ai": ("Authorization", bearer("POLLINATIONS_API_KEY"))}
+    KEYS_FOUND = {"gemini": bool(k["GEMINI_API_KEY"]), "openai": bool(k["OPENAI_API_KEY"]), "fal": bool(k["FAL_KEY"]), "unsloth": bool(k["UNSLOTH_API_KEY"]),
+                  "cloudflare": bool(k["CLOUDFLARE_API_TOKEN"]), "cloudflareAccount": bool(k["CLOUDFLARE_ACCOUNT_ID"]), "pollinations": bool(k["POLLINATIONS_API_KEY"])}
+load_keys(verbose=True)
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -50,6 +68,7 @@ class Handler(SimpleHTTPRequestHandler):
     def body(self): return self.rfile.read(int(self.headers.get("Content-Length", 0)) or 0)
 
     def do_GET(self):
+        load_keys()
         if self.path == "/api/health": return self.send_json({"ok": True, "server": "local", "keys": KEYS_FOUND})
         if self.path == "/api/export.csv": return self.export()
         if self.path == "/api/sessions": return self.send_json([json.loads(p.read_text()) for p in sorted(SESSIONS.glob("*.json"))])
@@ -66,9 +85,9 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json({"error": str(e)}, 500)
 
     def proxy(self):
-        req = json.loads(self.body() or b"{}")
+        load_keys(); req = json.loads(self.body() or b"{}")
         url, method = req.get("url", ""), req.get("method", "GET")
-        if "{account}" in url: url = url.replace("{account}", os.environ.get("CLOUDFLARE_ACCOUNT_ID", ""))
+        if "{account}" in url: url = url.replace("{account}", KEYS["CLOUDFLARE_ACCOUNT_ID"])
         if not re.match(r"^https?://", url): return self.send_json({"error": "bad url"}, 400)
         headers = {k: v for k, v in (req.get("headers") or {}).items() if v}
         host = re.sub(r"^https?://([^/]+).*$", r"\1", url)
@@ -107,6 +126,6 @@ class Handler(SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     found = [k for k, v in KEYS_FOUND.items() if v]
     print(f"\n  Master of Your Universe is running on http://localhost:{PORT}")
-    print(f"  Photo keys loaded from keys.env: {', '.join(found) if found else 'none (3D only)'}")
+    print(f"  Photo keys loaded: {', '.join(found) if found else 'none yet (add them to master-of-your-universe.env on your Desktop, then reload the page)'}")
     print("  Keep this window open while you play. Close it to stop.\n")
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

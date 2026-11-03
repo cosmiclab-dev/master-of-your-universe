@@ -54,9 +54,11 @@ function title() {
     <button class="gbtn navy ibtn corner" id="fac" type="button" aria-label="Facilitator settings" title="Facilitator">${svg('gear')}</button>
     <div class="title-stack"><h1 class="logo" id="logo"><span class="l1">Master of</span><span class="l2">Your Universe</span></h1>
       <p class="tagline">Design the office you’d actually want to work in.</p>
-      <button class="gbtn big" id="start" type="button">START</button></div></section>`);
+      <button class="gbtn big" id="start" type="button">START</button>
+      <button class="phstat" id="phstat" type="button"></button></div></section>`);
   Builder.floor($('#floor'), DEMO, {drift: true, clear: true, pad: 0.95});
   $('#start').onclick = onboardName; $('#fac').onclick = () => facilitator();
+  const ps = Img.status(), pe = $('#phstat'); pe.className = 'phstat ' + (ps.on ? 'on' : 'off'); pe.innerHTML = `<i></i>${esc(ps.why)}`; pe.onclick = () => facilitator();
   let t; $('#logo').onpointerdown = () => { t = setTimeout(() => facilitator(), 800); }; $('#logo').onpointerup = () => clearTimeout(t);
 }
 
@@ -139,7 +141,7 @@ function step() {
         <div class="picks" id="pk"></div>
         <div class="opts ${k === 'close.favourite' ? 'stops' : ''}" id="opts">${k === 'close.favourite' ? favCards() : opts.map((o, j) => card(o, k, j)).join('')}</div>
         ${st.free_text ? `<div class="freebox"><span class="plus">${svg('plus', '#7fd3ff', 4)}</span><input class="inp" id="free" maxlength="80" placeholder="Your own idea (optional)" value="${esc(G.free[k] || '')}" aria-label="Your own idea"></div>` : ''}
-        <div class="qfoot"><button class="gbtn navy" id="back" type="button">BACK</button><button class="gbtn" id="next" type="button">${esc(c.button || 'NEXT')}</button></div>
+        <div class="qfoot"><button class="gbtn navy" id="back" type="button">BACK</button>${k === 'close.favourite' ? '' : '<button class="gbtn navy" id="skip" type="button">SKIP</button>'}<button class="gbtn" id="next" type="button">${esc(c.button || 'NEXT')}</button></div>
         <div class="coach" id="coach" hidden>Tap a setup to place it</div>
       </aside></div></section>`);
   bindHud();
@@ -150,6 +152,12 @@ function step() {
   if (st.free_text) $('#free').oninput = e => { G.free[k] = e.target.value; foot(); };
   $('#back').onclick = () => { if (G.i === 0) return onboardFloor(); const prev = D.steps[G.i - 1]; G.i--; if (stopOf(prev.step) !== s) return route(s === 'close' ? 's3' : s); step(); };
   $('#next').onclick = next;
+  // skip: move on without choosing. A space still needs a layout to build, so a skipped layout gets the standard one.
+  if ($('#skip')) $('#skip').onclick = () => {
+    if (Object.values(LAYOUT).includes(k)) { G.picks[k] = opts[0] ? [opts[0].id] : []; toast('Standard layout used'); }
+    else { G.picks[k] = []; delete G.free[k]; }
+    next();
+  };
   if (!G.coached && k === 's1.cluster') $('#coach').hidden = false;
   foot(); paint(isClose ? 'close' : s);
 }
@@ -274,7 +282,7 @@ async function photo(s, show) {
   G.photoBusy[s] = true; G.photoErr[s] = null; if (onStop(s)) photoUI(s);
   const snap = Builder.snapshot(s, G.picks);
   const prompt = `${D.diorama.look} Use the attached 3D model as the exact layout: keep every piece of furniture in the same place, size and colour, and keep the same camera angle and platform. Replace the simple blocks with real, detailed furniture and materials. The space: ${sceneText(s)}`;
-  const textPrompt = `${D.diorama.look} On the platform: ${sceneText(s)}`;
+  const textPrompt = photoText(s);
   try { const r = await Img.run({prompt, textPrompt, refs: [snap]}); G.photo[s] = {url: r.url, key}; if (show || onStop(s)) G.view[s] = 'photo'; }
   catch (e) { G.photoErr[s] = e.message; console.warn('photo', e.message); }
   G.photoBusy[s] = false;
@@ -295,6 +303,13 @@ function change() {
   $('#skip').onclick = () => { G.change = ''; reveal(); }; $('#go').onclick = () => { G.change = clean($('#chg').value); reveal(); };
 }
 const CAP = {'s1.desk': 2, 's1.near': 3, 's2.seat': 2, 's2.fun': 2, 's2.work': 2, 's3.kit': 3};
+// short, scene-first prompt for text-to-image models (Cloudflare, Pollinations): they read the start of a prompt most closely
+function photoText(s, again) {
+  return `Photorealistic professional architectural interior photograph, eye level, 24mm lens, two-point perspective. ${eyeLevel(s)} `
+    + `Newly completed engineering office in South Korea: white exposed concrete ceiling with linear LED lights and acoustic baffles, polished concrete floor with grey carpet tiles, floor-to-ceiling windows with green hills outside. `
+    + `Materials: pale white oak, matte white, sage-green and warm-grey felt, black steel. Real contract office furniture, correct proportions, soft natural daylight, true-to-life colour, crisp detail, magazine quality. No people, no text, no watermark.`
+    + (again ? ` Variation ${Date.now() % 997}.` : '');
+}
 function eyeLevel(s) {
   const frags = k => [...(G.picks[k] || [])].sort((a, b) => (OPT[b].wildcard ? 1 : 0) - (OPT[a].wildcard ? 1 : 0)).slice(0, CAP[k] || 9).map(id => OPT[id].fragment).filter(Boolean);
   const parts = [], add = (pre, a, post = '') => { if (a.length) parts.push(pre + list(a) + post + '.'); }, cap1 = t => t.charAt(0).toUpperCase() + t.slice(1);
@@ -317,7 +332,7 @@ async function reveal(again) {
   if (Img.isOffline()) { $('#frame .scan').remove(); $('#fchip').remove(); confetti(160); return; }
   const ref = G.photo[s]?.url || Builder.snapshot(s, G.picks);
   const prompt = D.final + eyeLevel(s) + ` ${D.style.shell} ${D.style.realism} ${D.style.camera.wide} ${D.style.negative}` + (again ? ` Alternative take ${Date.now() % 997}.` : '');
-  const textPrompt = `Professional architectural interior photograph for a workplace design presentation, 16:9 frame. ${eyeLevel(s)} ${D.style.shell} ${D.style.realism} ${D.style.camera.wide} ${D.style.negative}` + (again ? ` Alternative take ${Date.now() % 997}.` : '');
+  const textPrompt = photoText(s, again);
   try {
     const r = await Img.run({prompt, textPrompt, refs: [ref], final: true}); G.final = r.url;
     if (!$('#fimg')) return;

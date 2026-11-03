@@ -174,6 +174,10 @@ button{cursor:pointer}
 .freebox .inp{flex:1;min-width:0;font-size:15px;padding:10px 12px}
 .qfoot{display:flex;gap:12px;justify-content:space-between}
 .qfoot .gbtn{flex:1}
+.qfoot #skip{flex:.7;opacity:.85}
+.phstat{display:inline-flex;align-items:center;gap:8px;margin-top:18px;padding:8px 14px;border-radius:999px;border:0;cursor:pointer;font:800 13px/1.2 Nunito,sans-serif;color:#fff;background:rgba(10,16,40,.55);max-width:min(92vw,520px);text-align:left}
+.phstat i{width:10px;height:10px;border-radius:50%;flex:none;background:#FAC602;box-shadow:0 0 0 3px rgba(250,198,2,.25)}
+.phstat.on i{background:#53CE17;box-shadow:0 0 0 3px rgba(83,206,23,.25)}
 
 /* banners, toasts, confetti */
 .banner{position:fixed;inset:0;z-index:20;display:grid;place-items:center;pointer-events:none}

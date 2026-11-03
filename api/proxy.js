@@ -7,6 +7,7 @@ const ENV = {
   'api.openai.com': ['Authorization', process.env.OPENAI_API_KEY && 'Bearer ' + process.env.OPENAI_API_KEY],
   'fal.run': ['Authorization', process.env.FAL_KEY && 'Key ' + process.env.FAL_KEY],
   'api.cloudflare.com': ['Authorization', process.env.CLOUDFLARE_API_TOKEN && 'Bearer ' + process.env.CLOUDFLARE_API_TOKEN],
+  'image.pollinations.ai': ['Authorization', process.env.POLLINATIONS_API_KEY && 'Bearer ' + process.env.POLLINATIONS_API_KEY],
 };
 export const config = { maxDuration: 60 };
 export default async function handler(req, res) {
