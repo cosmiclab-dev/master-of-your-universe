@@ -15,6 +15,7 @@
   function merge(a, b) { for (const k in b) { if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k])) a[k] = merge(a[k] || {}, b[k]); else a[k] = b[k]; } return a; }
   const load = () => { try { return merge(structuredClone(DEFAULTS), JSON.parse(localStorage.getItem('moyu-settings') || '{}')); } catch (e) { return structuredClone(DEFAULTS); } };
   let S = load();
+  if (S.provider === 'pollinations') { S.provider = 'cloudflare'; S.route = 'auto'; }
   if (/flux-1-schnell/.test(S.models.cloudflare || '')) S.models.cloudflare = DEFAULTS.models.cloudflare;   // move older saved settings to FLUX.2
   if (/flux-2-dev/.test(S.models.cloudflareFinal || '')) S.models.cloudflareFinal = DEFAULTS.models.cloudflareFinal;
   const save = s => { S = s; try { localStorage.setItem('moyu-settings', JSON.stringify(s)); } catch (e) {} };
@@ -218,7 +219,7 @@
     : p === 'custom' ? !!S.base.custom : p === 'offline' ? false : !!(S.keys[p] || serverKeys[p]);
   const serverChoice = () => (serverKeys.cloudflare && serverKeys.cloudflareAccount) ? 'cloudflare' : serverKeys.gemini ? 'gemini' : serverKeys.openai ? 'openai' : serverKeys.fal ? 'fal' : null;
   // if the chosen model fails on its key or billing, try the next one that has a key
-  const backups = () => ['cloudflare', 'gemini', 'openai', 'fal', 'pollinations'].filter(p => p !== S.provider && keyed(p));
+  const backups = () => ['cloudflare', 'gemini', 'openai', 'fal'].filter(p => p !== S.provider && keyed(p));
   const keyProblem = m => /refused|billing|credit|key|token|account ID|Too many/i.test(m || '');
 
   const dead = new Set();   // models that failed on key or billing this session are skipped next time
@@ -230,7 +231,7 @@
       const key = 'r:' + name + ':' + JSON.stringify(S.models) + ':' + hash(job.prompt + '|' + refs.map(r => hash(r.slice(-4000))).join(','));
       const hit = await cacheGet(key); if (hit) return {url: hit, cached: true, provider: name};
       try { const url = await p.run({prompt: refs.length ? job.prompt : (job.textPrompt || job.prompt), refs, final: !!job.final}); await cachePut(key, url); return {url, cached: false, provider: name}; }
-      catch (e) { last = e; console.warn(name, e.message); if (name !== 'pollinations') dead.add(name); }
+      catch (e) { last = e; console.warn(name, e.message); if (keyProblem(e.message)) dead.add(name); }
     }
     throw last || new Error('No photo model is set up.');
   }
@@ -242,7 +243,7 @@
     // keys in the env file win; with no keys anywhere, fall back to Pollinations (free, no key) so photos still work
     const p = ok ? serverChoice() : null;
     if (p && (stuck || (auto && S.provider !== p))) { S.provider = p; S.route = 'auto'; save(S); }
-    else if (!p && stuck) { S.provider = 'pollinations'; S.route = 'auto'; save(S); }
+
   }
   const ready = sync();
   // plain-language status for the title screen
