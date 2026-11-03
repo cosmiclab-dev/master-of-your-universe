@@ -175,7 +175,7 @@
       if (/flux-2/.test(model)) { const fd = new FormData(); fd.append('prompt', prompt.slice(0, 2800)); fd.append('width', '1344'); fd.append('height', '768'); opts = {method: 'POST', headers: this.auth(), body: fd}; }
       else opts = {method: 'POST', headers: {'Content-Type': 'application/json', ...this.auth()}, body: JSON.stringify({prompt: prompt.slice(0, 2000), steps: 8})};
       const r = await xfetch(this.url(`/ai/run/${model}`), opts);
-      const j = await readJson(r); if (!r.ok || j.success === false) throw new Error(j.errors?.[0]?.message ? `Cloudflare: ${j.errors[0].message}` : errMsg(j, r));
+      const j = await readJson(r); if (!r.ok || j.success === false) throw new Error(/free allocation|neurons/i.test(j.errors?.[0]?.message || '') ? 'Cloudflare: today’s free photo allowance is used up. It resets at 5:30 AM India time, or add a token from another Cloudflare account in Facilitator.' : j.errors?.[0]?.message ? `Cloudflare: ${j.errors[0].message}` : errMsg(j, r));
       const b64 = j.result?.image; if (!b64) throw new Error('Cloudflare answered but sent no image.');
       return `data:image/jpeg;base64,${b64}`;
     },
