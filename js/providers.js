@@ -4,12 +4,13 @@
 (function () {
   const DEFAULTS = {
     provider: 'offline', route: 'auto', quality: 'high', coins: false, kiosk: false,
-    keys: {gemini: '', openai: '', fal: '', unsloth: '', custom: ''},
-    models: {gemini: 'gemini-3.1-flash-image', openai: 'gpt-image-1', falGen: 'fal-ai/qwen-image', falEdit: 'fal-ai/qwen-image-edit', unsloth: '', custom: ''},
-    base: {gemini: 'https://generativelanguage.googleapis.com/v1beta', openai: 'https://api.openai.com/v1', fal: 'https://fal.run', unsloth: 'http://127.0.0.1:8888/v1', custom: ''},
+    keys: {gemini: '', openai: '', fal: '', unsloth: '', custom: '', cloudflare: '', pollinations: ''},
+    models: {gemini: 'gemini-3.1-flash-image', openai: 'gpt-image-1', falGen: 'fal-ai/qwen-image', falEdit: 'fal-ai/qwen-image-edit', unsloth: '', custom: '', cloudflare: '@cf/black-forest-labs/flux-1-schnell', pollinations: 'flux'},
+    base: {gemini: 'https://generativelanguage.googleapis.com/v1beta', openai: 'https://api.openai.com/v1', fal: 'https://fal.run', unsloth: 'http://127.0.0.1:8888/v1', custom: '', cloudflare: 'https://api.cloudflare.com/client/v4', pollinations: 'https://image.pollinations.ai'},
+    account: {cloudflare: ''},
     caps: {},
   };
-  const NAMES = {offline: '3D only (no photos)', gemini: 'Nano Banana 2 (Gemini)', openai: 'OpenAI images', fal: 'fal.ai', unsloth: 'Unsloth on this laptop', custom: 'OpenAI-compatible API'};
+  const NAMES = {offline: '3D only (no photos)', gemini: 'Nano Banana 2 (Gemini)', openai: 'OpenAI images', fal: 'fal.ai', cloudflare: 'Cloudflare (free daily)', pollinations: 'Pollinations (free, no key)', unsloth: 'Unsloth on this laptop', custom: 'OpenAI-compatible API'};
 
   function merge(a, b) { for (const k in b) { if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k])) a[k] = merge(a[k] || {}, b[k]); else a[k] = b[k]; } return a; }
   const load = () => { try { return merge(structuredClone(DEFAULTS), JSON.parse(localStorage.getItem('moyu-settings') || '{}')); } catch (e) { return structuredClone(DEFAULTS); } };
@@ -156,6 +157,39 @@
     },
     async test() { if (!S.keys.fal && !(await useProxy())) throw new Error('Add a fal.ai key.'); return 'Key saved. fal.ai has no free check, so the first photo confirms it.'; },
   };
+
+  // Cloudflare Workers AI: free daily allowance (about 170 FLUX images a day). Text to image only.
+  P.cloudflare = {
+    edits: false,
+    url(path) { return `${S.base.cloudflare}/accounts/${S.account.cloudflare || '{account}'}${path}`; },
+    auth() { return S.keys.cloudflare ? {Authorization: 'Bearer ' + S.keys.cloudflare} : {}; },
+    async run({prompt}) {
+      if (!S.keys.cloudflare && !(await useProxy())) throw new Error('Add a Cloudflare API token in Settings, or put it in keys.env.');
+      if (!S.account.cloudflare && !serverKeys.cloudflareAccount) throw new Error('Add your Cloudflare account ID in Settings, or put it in keys.env.');
+      const r = await xfetch(this.url(`/ai/run/${S.models.cloudflare}`), {method: 'POST', headers: {'Content-Type': 'application/json', ...this.auth()}, body: JSON.stringify({prompt: prompt.slice(0, 2000), steps: 8})});
+      const j = await readJson(r); if (!r.ok || j.success === false) throw new Error(j.errors?.[0]?.message ? `Cloudflare: ${j.errors[0].message}` : errMsg(j, r));
+      const b64 = j.result?.image; if (!b64) throw new Error('Cloudflare answered but sent no image.');
+      return `data:image/jpeg;base64,${b64}`;
+    },
+    async test() {
+      const r = await xfetch(`${S.base.cloudflare}/user/tokens/verify`, {headers: this.auth()}); const j = await readJson(r);
+      if (!r.ok || j.success === false) throw new Error('Cloudflare refused the token. It needs the Workers AI permission.');
+      if (!S.account.cloudflare && !serverKeys.cloudflareAccount) return 'Token works. Now add your Cloudflare account ID.';
+      return 'Connected to Cloudflare Workers AI. Photos are made from a text description (FLUX), about 170 free a day.';
+    },
+  };
+  // Pollinations: free, no key needed (slow: about one image every 15 seconds without a key). Text to image only.
+  P.pollinations = {
+    edits: false,
+    async run({prompt}) {
+      const q = new URLSearchParams({width: '1344', height: '768', seed: '42', model: S.models.pollinations || 'flux', nologo: 'true', ...(S.keys.pollinations ? {token: S.keys.pollinations} : {})});
+      const r = await xfetch(`${S.base.pollinations}/prompt/${encodeURIComponent(prompt.slice(0, 1500))}?${q}`);
+      if (!r.ok) { const j = await readJson(r); throw new Error(r.status === 429 ? 'Pollinations is busy. Wait 15 seconds and try again.' : errMsg(j, r)); }
+      const blob = await r.blob(); if (!blob.type.startsWith('image')) throw new Error('Pollinations sent no image.');
+      return blobToDataUrl(blob);
+    },
+    async test() { return 'Pollinations needs no key. Press Try a photo to check it (it can take 15 to 40 seconds).'; },
+  };
   P.offline = {edits: false, async run() { throw new Error('offline'); }, async test() { return 'No photo model. The game shows the 3D build only.'; }};
 
   // ---------------------------------------------------------- cache
@@ -174,7 +208,7 @@
     await cachePut(key, url); return {url, cached: false};
   }
   // first run on the laptop: if keys.env has a Gemini key, switch photos on without any setup
-  const ready = hasServer().then(ok => { if (ok && serverKeys.gemini && S.provider === 'offline' && !S.chosen) { S.provider = 'gemini'; S.route = 'auto'; save(S); } });
+  const ready = hasServer().then(ok => { if (ok && S.provider === 'offline' && !S.chosen) { const p = serverKeys.gemini ? 'gemini' : serverKeys.cloudflare ? 'cloudflare' : null; if (p) { S.provider = p; S.route = 'auto'; save(S); } } });
   window.Img = {
     ready, serverKeys: () => serverKeys,
     NAMES, get settings() { return S; }, save, load, run, hasServer, useProxy, cacheClear, hash,

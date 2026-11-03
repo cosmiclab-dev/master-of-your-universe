@@ -19,6 +19,11 @@ stop, can change one thing, and gets a photoreal eye-level render of it.
 
 Billing: a Google AI Pro subscription does not cover the API. In Google AI Studio, enable billing on the key's project. Nano Banana 2 costs about $0.07 per 1K image and $0.10 per 2K image. The game makes the three space photos at 1K and the final photo at 2K, so about $0.30 to $0.40 per player.
 
+## Free photo options
+- **Cloudflare Workers AI** (about 170 photos a day free): make a free Cloudflare account, create an API token with the Workers AI permission, and put `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in `keys.env`. The game switches it on by itself if there's no Gemini key.
+- **Pollinations** (no key at all): pick it in Facilitator → Photos. Slow (about one photo every 15 seconds) and may add a small watermark.
+Both make photos from a text description, so they follow the player's picks but not the exact 3D layout. For the client demo, Nano Banana 2 gives the most faithful result.
+
 ## Image models (Settings, the gear button)
 | Choice | What to enter |
 | --- | --- |

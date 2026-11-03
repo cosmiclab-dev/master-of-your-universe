@@ -360,6 +360,8 @@ function facilitator(tab = 'photos') {
   function provFields() {
     const p = S.provider, adv = k => `<details class="adv"><summary>Advanced</summary>${field('b', 'Endpoint', S.base[k], 'text')}</details>`;
     if (p === 'gemini') return `<div class="grid2">${field('k', 'Gemini API key', S.keys.gemini, 'password', Img.serverKeys().gemini ? 'Using the key in keys.env' : 'From Google AI Studio')}${field('m', 'Model', S.models.gemini, 'text', 'gemini-3.1-flash-image')}</div>${adv('gemini')}<p class="note">Best for the client demo: it turns the 3D build into a photo and keeps the layout.</p>`;
+    if (p === 'cloudflare') return `<div class="grid2">${field('acct', 'Cloudflare account ID', S.account.cloudflare, 'text', Img.serverKeys().cloudflareAccount ? 'Using the ID in keys.env' : 'From the Cloudflare dashboard')}${field('k', 'API token', S.keys.cloudflare, 'password', Img.serverKeys().cloudflare ? 'Using the token in keys.env' : 'Workers AI permission')}${field('m', 'Model', S.models.cloudflare, 'text', '@cf/black-forest-labs/flux-1-schnell')}</div><p class="note">Free: about 170 photos a day. It works from a text description, so photos follow your picks but not the exact 3D layout.</p>`;
+    if (p === 'pollinations') return `<div class="grid2">${field('k', 'Token (optional)', S.keys.pollinations, 'password', 'Removes the watermark and speeds it up')}${field('m', 'Model', S.models.pollinations, 'text', 'flux')}</div><p class="note">Free and needs no key, but slow (about one photo every 15 seconds) and may add a small watermark. It works from a text description only.</p>`;
     if (p === 'openai') return `<div class="grid2">${field('k', 'OpenAI API key', S.keys.openai, 'password', 'sk-…')}${field('m', 'Model', S.models.openai, 'text', 'gpt-image-1')}</div>${adv('openai')}`;
     if (p === 'fal') return `<div class="grid2">${field('k', 'fal.ai key', S.keys.fal, 'password')}${field('m', 'Model for new images', S.models.falGen, 'text', 'fal-ai/qwen-image')}${field('m2', 'Model for edits', S.models.falEdit, 'text', 'fal-ai/qwen-image-edit')}</div>${adv('fal')}`;
     if (p === 'unsloth' || p === 'custom') return `<div class="grid2">${field('b', 'Server address', S.base[p], 'text', p === 'unsloth' ? 'http://127.0.0.1:8888/v1' : 'https://…/v1')}${field('k', 'API key', S.keys[p], 'password', p === 'unsloth' ? 'sk-unsloth-…' : '')}${field('m', 'Image model', S.models[p], 'text', 'Press Test to list models', 'mlist')}</div>
@@ -374,6 +376,7 @@ function facilitator(tab = 'photos') {
     if (v('k') !== undefined) S.keys[p] = v('k');
     if (p === 'fal') { S.models.falGen = v('m') || 'fal-ai/qwen-image'; S.models.falEdit = v('m2') || 'fal-ai/qwen-image-edit'; } else if (v('m') !== undefined) S.models[p] = v('m');
     if (v('b')) S.base[p] = v('b');
+    if (p === 'cloudflare' && v('acct') !== undefined) S.account.cloudflare = v('acct');
   }
   const say = (t, c) => { const el = $('#st'); if (!el) return; el.hidden = false; el.className = 'status ' + (c || ''); el.textContent = t; };
   function draw() {

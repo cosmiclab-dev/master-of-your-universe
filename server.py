@@ -31,8 +31,10 @@ load_keys()
 ENV_KEYS = {"generativelanguage.googleapis.com": ("x-goog-api-key", os.environ.get("GEMINI_API_KEY", "")),
             "api.openai.com": ("Authorization", "Bearer " + os.environ["OPENAI_API_KEY"] if os.environ.get("OPENAI_API_KEY") else ""),
             "fal.run": ("Authorization", "Key " + os.environ["FAL_KEY"] if os.environ.get("FAL_KEY") else ""),
+            "api.cloudflare.com": ("Authorization", "Bearer " + os.environ["CLOUDFLARE_API_TOKEN"] if os.environ.get("CLOUDFLARE_API_TOKEN") else ""),
             "127.0.0.1:8888": ("Authorization", "Bearer " + os.environ["UNSLOTH_API_KEY"] if os.environ.get("UNSLOTH_API_KEY") else "")}
-KEYS_FOUND = {"gemini": bool(os.environ.get("GEMINI_API_KEY")), "openai": bool(os.environ.get("OPENAI_API_KEY")), "fal": bool(os.environ.get("FAL_KEY")), "unsloth": bool(os.environ.get("UNSLOTH_API_KEY"))}
+KEYS_FOUND = {"gemini": bool(os.environ.get("GEMINI_API_KEY")), "openai": bool(os.environ.get("OPENAI_API_KEY")), "fal": bool(os.environ.get("FAL_KEY")), "unsloth": bool(os.environ.get("UNSLOTH_API_KEY")),
+              "cloudflare": bool(os.environ.get("CLOUDFLARE_API_TOKEN")), "cloudflareAccount": bool(os.environ.get("CLOUDFLARE_ACCOUNT_ID"))}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -66,6 +68,7 @@ class Handler(SimpleHTTPRequestHandler):
     def proxy(self):
         req = json.loads(self.body() or b"{}")
         url, method = req.get("url", ""), req.get("method", "GET")
+        if "{account}" in url: url = url.replace("{account}", os.environ.get("CLOUDFLARE_ACCOUNT_ID", ""))
         if not re.match(r"^https?://", url): return self.send_json({"error": "bad url"}, 400)
         headers = {k: v for k, v in (req.get("headers") or {}).items() if v}
         host = re.sub(r"^https?://([^/]+).*$", r"\1", url)
