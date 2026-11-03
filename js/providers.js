@@ -16,6 +16,7 @@
   const load = () => { try { return merge(structuredClone(DEFAULTS), JSON.parse(localStorage.getItem('moyu-settings') || '{}')); } catch (e) { return structuredClone(DEFAULTS); } };
   let S = load();
   if (/flux-1-schnell/.test(S.models.cloudflare || '')) S.models.cloudflare = DEFAULTS.models.cloudflare;   // move older saved settings to FLUX.2
+  if (/flux-2-dev/.test(S.models.cloudflareFinal || '')) S.models.cloudflareFinal = DEFAULTS.models.cloudflareFinal;
   const save = s => { S = s; try { localStorage.setItem('moyu-settings', JSON.stringify(s)); } catch (e) {} };
 
   // ---------------------------------------------------------- transport
