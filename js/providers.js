@@ -5,7 +5,7 @@
   const DEFAULTS = {
     provider: 'offline', route: 'auto', quality: 'high', coins: false, kiosk: false,
     keys: {gemini: '', openai: '', fal: '', unsloth: '', custom: '', cloudflare: '', pollinations: ''},
-    models: {gemini: 'gemini-3.1-flash-image', openai: 'gpt-image-1', falGen: 'fal-ai/qwen-image', falEdit: 'fal-ai/qwen-image-edit', unsloth: '', custom: '', cloudflare: '@cf/black-forest-labs/flux-2-klein-9b', cloudflareFinal: '@cf/black-forest-labs/flux-2-dev', pollinations: 'flux'},
+    models: {gemini: 'gemini-3.1-flash-image', openai: 'gpt-image-1', falGen: 'fal-ai/qwen-image', falEdit: 'fal-ai/qwen-image-edit', unsloth: '', custom: '', cloudflare: '@cf/black-forest-labs/flux-2-klein-9b', cloudflareFinal: '@cf/black-forest-labs/flux-2-klein-9b', pollinations: 'flux'},
     base: {gemini: 'https://generativelanguage.googleapis.com/v1beta', openai: 'https://api.openai.com/v1', fal: 'https://fal.run', unsloth: 'http://127.0.0.1:8888/v1', custom: '', cloudflare: 'https://api.cloudflare.com/client/v4', pollinations: 'https://image.pollinations.ai'},
     account: {cloudflare: ''},
     caps: {},
@@ -167,7 +167,7 @@
     async run({prompt, final}) {
       if (!S.keys.cloudflare && !(await useProxy())) throw new Error('Add a Cloudflare API token in Settings, or put it in keys.env.');
       if (!S.account.cloudflare && !serverKeys.cloudflareAccount) throw new Error('Add your Cloudflare account ID in Settings, or put it in keys.env.');
-      // stop photos: FLUX.2 klein (about 3 s). Final photo: FLUX.2 dev (about 15 s, best detail). FLUX.2 takes a multipart form.
+      // stop photos: FLUX.2 klein (about 3 s). Final photo: also klein, which spends far less of the free daily allowance than FLUX.2 dev. FLUX.2 takes a multipart form.
       const model = (final && S.models.cloudflareFinal) || S.models.cloudflare;
       let opts;
       if (/flux-2/.test(model)) { const fd = new FormData(); fd.append('prompt', prompt.slice(0, 2800)); fd.append('width', '1344'); fd.append('height', '768'); opts = {method: 'POST', headers: this.auth(), body: fd}; }
